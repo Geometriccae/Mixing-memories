@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpDown, Eye, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import CategoryCreateDialog from "@/pages/admin/categoryDialogs/CategoryCreateDialog";
@@ -187,6 +187,195 @@ const ManageProducts = () => {
   const [editProductOpen, setEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<AdminProductRow | null>(null);
   const [products, setProducts] = useState<AdminProductRow[]>(productsRowsInit);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const adminTokenRef = useRef<string | null>(sessionStorage.getItem("admin_token"));
+
+  // Map UI row ids (number) to backend MongoDB ids (string).
+  // Backend uses ObjectId strings; your UI types keep `id: number`.
+  const categoryBackendIdByRowIdRef = useRef<Map<number, string>>(new Map());
+  const categoryBackendIdByNameRef = useRef<Map<string, string>>(new Map());
+  const subcategoryBackendIdByRowIdRef = useRef<Map<number, string>>(new Map());
+  const subcategoryBackendIdByCategoryAndNameRef = useRef<Map<string, string>>(new Map());
+  const productBackendIdByRowIdRef = useRef<Map<number, string>>(new Map());
+
+  const requireAdminToken = () => {
+    const token = adminTokenRef.current ?? sessionStorage.getItem("admin_token");
+    adminTokenRef.current = token;
+    return token;
+  };
+
+  const authedFetch = async (path: string, init?: RequestInit, requireAuth = false) => {
+    const token = requireAdminToken();
+    if (requireAuth && !token) {
+      throw new Error("Admin token missing. Please login to the admin panel.");
+    }
+
+    const headers = new Headers(init?.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    return fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers,
+    });
+  };
+
+  const toBlob = async (src: string): Promise<Blob> => {
+    // Case 1: data URL from FileReader
+    if (src.startsWith("data:")) {
+      const [meta, base64] = src.split(",");
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      const mime = mimeMatch?.[1] || "image/png";
+      const bin = atob(base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    }
+
+    // Case 2: normal URL (Vite assets or backend uploads)
+    const res = await fetch(src);
+    if (!res.ok) throw new Error("Failed to load image for upload.");
+    return res.blob();
+  };
+
+  const refreshAll = async () => {
+    setDataLoaded(false);
+
+    type BackendCategory = {
+      _id?: string;
+      name?: string;
+      image?: string;
+      createdAt?: string;
+    };
+
+    type BackendSubcategory = {
+      _id?: string;
+      name?: string;
+      createdAt?: string;
+      categoryId?: { name?: string };
+    };
+
+    type BackendProduct = {
+      _id?: string;
+      name?: string;
+      description?: string;
+      price?: number | string;
+      image?: string;
+      categoryId?: { name?: string };
+      subCategoryId?: { name?: string };
+      createdAt?: string;
+    };
+
+    // Clear mappings before refilling.
+    categoryBackendIdByRowIdRef.current = new Map();
+    categoryBackendIdByNameRef.current = new Map();
+    subcategoryBackendIdByRowIdRef.current = new Map();
+    subcategoryBackendIdByCategoryAndNameRef.current = new Map();
+    productBackendIdByRowIdRef.current = new Map();
+
+    // Categories
+    const catRes = await fetch(`${apiBaseUrl}/api/categories`);
+    if (!catRes.ok) throw new Error("Failed to load categories.");
+    const catJson: unknown = await catRes.json();
+    const catData = (catJson as { data?: unknown }).data;
+    const catItems: BackendCategory[] = Array.isArray(catData) ? (catData as BackendCategory[]) : [];
+    const catImages = [categoryVegetables, categoryFruits, categoryBakery, categoryDairy];
+    const nextCategories: AdminCategoryRow[] = catItems.map((c, idx) => {
+      const rawImg = c?.image ?? "";
+      const fromApi =
+        typeof rawImg === "string" && rawImg.startsWith("/uploads/") ? `${apiBaseUrl}${rawImg}` : rawImg;
+      const fallback = catImages[idx % catImages.length] ?? categoryVegetables;
+      return {
+        id: idx + 1,
+        name: c?.name ?? "",
+        image: fromApi || fallback,
+        created: c?.createdAt ? new Date(c.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      };
+    });
+    nextCategories.forEach((row) => {
+      const backend = catItems[row.id - 1]?._id;
+      if (backend) categoryBackendIdByRowIdRef.current.set(row.id, backend);
+    });
+    catItems.forEach((c) => {
+      if (c?._id && c?.name) categoryBackendIdByNameRef.current.set(c.name, c._id);
+    });
+    setCategories(nextCategories);
+
+    // Subcategories
+    const subRes = await fetch(`${apiBaseUrl}/api/subcategories`);
+    if (!subRes.ok) throw new Error("Failed to load subcategories.");
+    const subJson: unknown = await subRes.json();
+    const subData = (subJson as { data?: unknown }).data;
+    const subItems: BackendSubcategory[] = Array.isArray(subData) ? (subData as BackendSubcategory[]) : [];
+    const nextSubcategories: AdminSubcategoryRow[] = subItems.map((s, idx) => ({
+      id: idx + 1,
+      subName: s?.name ?? "",
+      categoryName: s?.categoryId?.name ?? "",
+      created: s?.createdAt ? new Date(s.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    }));
+    nextSubcategories.forEach((row) => {
+      const backend = subItems[row.id - 1]?._id;
+      if (backend) subcategoryBackendIdByRowIdRef.current.set(row.id, backend);
+    });
+    subItems.forEach((s) => {
+      const key = `${s?.categoryId?.name ?? ""}:${s?.name ?? ""}`;
+      if (s?._id && key) subcategoryBackendIdByCategoryAndNameRef.current.set(key, s._id);
+    });
+    setSubcategories(nextSubcategories);
+
+    // Products
+    const prodRes = await fetch(`${apiBaseUrl}/api/products?page=1&limit=1000`);
+    if (!prodRes.ok) throw new Error("Failed to load products.");
+    const prodJson: unknown = await prodRes.json();
+    const prodData = (prodJson as { data?: unknown }).data;
+    const prodItems: BackendProduct[] = Array.isArray(prodData) ? (prodData as BackendProduct[]) : [];
+
+    const nextProducts: AdminProductRow[] = prodItems.map((p, idx) => {
+      const backendImage = p?.image ?? "";
+      const imageUrl =
+        typeof backendImage === "string" && backendImage.startsWith("/uploads/") ? `${apiBaseUrl}${backendImage}` : backendImage;
+      const fallback = productImages[idx % productImages.length] ?? categoryVegetables;
+      const finalImage = imageUrl || fallback;
+
+      return {
+        id: idx + 1,
+        category: p?.categoryId?.name ?? "",
+        subCategory: p?.subCategoryId?.name ?? "",
+        name: p?.name ?? "",
+        image: finalImage,
+        variantImages: [finalImage, finalImage, finalImage],
+        stock: 0,
+        price: Number(p?.price ?? 0),
+        actualPrice: 0,
+        manufacturer: "Testing",
+        quality: "OEM",
+        description: p?.description ?? "",
+        specification: "",
+      };
+    });
+
+    nextProducts.forEach((row) => {
+      const backend = prodItems[row.id - 1]?._id;
+      if (backend) productBackendIdByRowIdRef.current.set(row.id, backend);
+    });
+    setProducts(nextProducts);
+
+    setDataLoaded(true);
+  };
+
+  useEffect(() => {
+    // Read-only fetch endpoints don't require auth, but writes do.
+    refreshAll()
+      .then(() => {
+        // noop
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(message || "Failed to load admin data.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tabTitle = tab === "category" ? "Category" : tab === "subcategory" ? "Sub Category" : "Products";
 
@@ -247,15 +436,37 @@ const ManageProducts = () => {
         open={createCategoryOpen}
         onOpenChange={setCreateCategoryOpen}
         onCreate={({ name, image }) => {
-          const img = image || categoryVegetables;
-          const row: AdminCategoryRow = {
-            id: Date.now(),
-            name,
-            image: img,
-            created: new Date().toISOString().slice(0, 10),
-          };
-          setCategories((c) => [...c, row]);
-          toast.success("Category created");
+          void (async () => {
+            if (!dataLoaded) {
+              toast.error("Please wait while data loads.");
+              return;
+            }
+            try {
+              const token = requireAdminToken();
+              if (!token) {
+                toast.error("Please login to create categories.");
+                return;
+              }
+
+              const form = new FormData();
+              form.append("name", name);
+              form.append("description", "");
+              if (image && image.startsWith("data:")) {
+                const blob = await toBlob(image);
+                const ext = blob.type.split("/")[1] || "png";
+                form.append("image", blob, `category-image.${ext}`);
+              }
+
+              const res = await authedFetch("/api/categories", { method: "POST", body: form }, true);
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json?.message || "Failed to create category.");
+              toast.success("Category created");
+              await refreshAll();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to create category.");
+            }
+          })();
         }}
       />
       <CategoryViewDialog open={viewCategoryOpen} onOpenChange={setViewCategoryOpen} category={selectedCategory} />
@@ -264,8 +475,34 @@ const ManageProducts = () => {
         onOpenChange={setEditCategoryOpen}
         category={selectedCategory}
         onUpdate={(id, { name, image }) => {
-          setCategories((c) => c.map((row) => (row.id === id ? { ...row, name, image } : row)));
-          toast.success("Category updated");
+          void (async () => {
+            if (!dataLoaded) {
+              toast.error("Please wait while data loads.");
+              return;
+            }
+            try {
+              const backendId = categoryBackendIdByRowIdRef.current.get(id);
+              if (!backendId) throw new Error("Category not found in mapping.");
+
+              const form = new FormData();
+              form.append("name", name);
+              form.append("description", "");
+              if (image.startsWith("data:")) {
+                const blob = await toBlob(image);
+                const ext = blob.type.split("/")[1] || "png";
+                form.append("image", blob, `category-image.${ext}`);
+              }
+
+              const res = await authedFetch(`/api/categories/${backendId}`, { method: "PUT", body: form }, true);
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json?.message || "Failed to update category.");
+              toast.success("Category updated");
+              await refreshAll();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to update category.");
+            }
+          })();
         }}
       />
       <SubCategoryCreateDialog
@@ -273,14 +510,33 @@ const ManageProducts = () => {
         onOpenChange={setCreateSubOpen}
         categoryOptions={categoryOptions}
         onCreate={({ subName, categoryName }) => {
-          const row: AdminSubcategoryRow = {
-            id: Date.now(),
-            subName,
-            categoryName,
-            created: new Date().toISOString().slice(0, 10),
-          };
-          setSubcategories((s) => [...s, row]);
-          toast.success("Sub category created");
+          void (async () => {
+            if (!dataLoaded) {
+              toast.error("Please wait while data loads.");
+              return;
+            }
+            try {
+              const backendCategoryId = categoryBackendIdByNameRef.current.get(categoryName);
+              if (!backendCategoryId) throw new Error("Parent category not found.");
+
+              const res = await authedFetch(
+                "/api/subcategories",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: subName, categoryId: backendCategoryId }),
+                },
+                true,
+              );
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json?.message || "Failed to create sub category.");
+              toast.success("Sub category created");
+              await refreshAll();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to create sub category.");
+            }
+          })();
         }}
       />
       <SubCategoryViewDialog open={viewSubOpen} onOpenChange={setViewSubOpen} subcategory={selectedSubcategory} />
@@ -290,8 +546,36 @@ const ManageProducts = () => {
         categoryOptions={categoryOptions}
         subcategory={selectedSubcategory}
         onUpdate={(id, { subName, categoryName }) => {
-          setSubcategories((s) => s.map((row) => (row.id === id ? { ...row, subName, categoryName } : row)));
-          toast.success("Sub category updated");
+          void (async () => {
+            if (!dataLoaded) {
+              toast.error("Please wait while data loads.");
+              return;
+            }
+            try {
+              const backendSubId = subcategoryBackendIdByRowIdRef.current.get(id);
+              if (!backendSubId) throw new Error("Sub category not found in mapping.");
+
+              const backendCategoryId = categoryBackendIdByNameRef.current.get(categoryName);
+              if (!backendCategoryId) throw new Error("Parent category not found.");
+
+              const res = await authedFetch(
+                `/api/subcategories/${backendSubId}`,
+                {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: subName, categoryId: backendCategoryId }),
+                },
+                true,
+              );
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json?.message || "Failed to update sub category.");
+              toast.success("Sub category updated");
+              await refreshAll();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to update sub category.");
+            }
+          })();
         }}
       />
       <ProductCreateDialog
@@ -301,9 +585,50 @@ const ManageProducts = () => {
         subcategories={subcategories}
         fallbackMainImage={categoryVegetables}
         onCreate={(data) => {
-          const row: AdminProductRow = { ...data, id: Date.now() };
-          setProducts((p) => [...p, row]);
-          toast.success("Product created");
+          void (async () => {
+            if (!dataLoaded) {
+              toast.error("Please wait while data loads.");
+              return;
+            }
+            try {
+              const backendCategoryId = categoryBackendIdByNameRef.current.get(data.category);
+              if (!backendCategoryId) throw new Error("Parent category not found.");
+
+              const subKey = `${data.category}:${data.subCategory}`;
+              const backendSubCategoryId = subcategoryBackendIdByCategoryAndNameRef.current.get(subKey);
+              if (!backendSubCategoryId) throw new Error("Sub category not found.");
+
+              const token = requireAdminToken();
+              if (!token) {
+                toast.error("Please login to create products.");
+                return;
+              }
+
+              const imageBlob = data.image ? await toBlob(data.image) : null;
+              if (!imageBlob) throw new Error("Product image is required.");
+
+              const imageExt = imageBlob.type.split("/")[1] || "png";
+              const fileName = `product-image.${imageExt}`;
+
+              const form = new FormData();
+              form.append("name", data.name);
+              form.append("description", data.description || "");
+              form.append("price", String(data.price));
+              form.append("categoryId", backendCategoryId);
+              form.append("subCategoryId", backendSubCategoryId);
+              form.append("image", imageBlob, fileName);
+
+              const res = await authedFetch("/api/products", { method: "POST", body: form }, true);
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json?.message || "Failed to create product.");
+
+              toast.success("Product created");
+              await refreshAll();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to create product.");
+            }
+          })();
         }}
       />
       <ProductViewDialog open={viewProductOpen} onOpenChange={setViewProductOpen} product={selectedProduct} />
@@ -314,8 +639,50 @@ const ManageProducts = () => {
         subcategories={subcategories}
         product={selectedProduct}
         onUpdate={(id, data) => {
-          setProducts((p) => p.map((row) => (row.id === id ? { ...row, ...data } : row)));
-          toast.success("Product updated");
+          void (async () => {
+            if (!dataLoaded) {
+              toast.error("Please wait while data loads.");
+              return;
+            }
+            try {
+              const backendProductId = productBackendIdByRowIdRef.current.get(id);
+              if (!backendProductId) throw new Error("Product not found in mapping.");
+
+              const backendCategoryId = categoryBackendIdByNameRef.current.get(data.category);
+              if (!backendCategoryId) throw new Error("Parent category not found.");
+
+              const subKey = `${data.category}:${data.subCategory}`;
+              const backendSubCategoryId = subcategoryBackendIdByCategoryAndNameRef.current.get(subKey);
+              if (!backendSubCategoryId) throw new Error("Sub category not found.");
+
+              const current = products.find((p) => p.id === id);
+              const imageChanged = current ? current.image !== data.image : true;
+
+              const form = new FormData();
+              form.append("name", data.name);
+              form.append("description", data.description || "");
+              form.append("price", String(data.price));
+              form.append("categoryId", backendCategoryId);
+              form.append("subCategoryId", backendSubCategoryId);
+
+              // Only upload if the user selected a new image (otherwise we omit and keep existing backend image).
+              if (imageChanged && data.image) {
+                const imageBlob = await toBlob(data.image);
+                const imageExt = imageBlob.type.split("/")[1] || "png";
+                form.append("image", imageBlob, `product-image.${imageExt}`);
+              }
+
+              const res = await authedFetch(`/api/products/${backendProductId}`, { method: "PUT", body: form }, true);
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(json?.message || "Failed to update product.");
+
+              toast.success("Product updated");
+              await refreshAll();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to update product.");
+            }
+          })();
         }}
       />
 
@@ -466,8 +833,24 @@ const ManageProducts = () => {
                           setEditCategoryOpen(true);
                         }}
                         onDelete={() => {
-                          setCategories((c) => c.filter((x) => x.id !== row.id));
-                          toast.success("Category removed");
+                          void (async () => {
+                            if (!dataLoaded) {
+                              toast.error("Please wait while data loads.");
+                              return;
+                            }
+                            try {
+                              const backendId = categoryBackendIdByRowIdRef.current.get(row.id);
+                              if (!backendId) throw new Error("Category not found in mapping.");
+                              const res = await authedFetch(`/api/categories/${backendId}`, { method: "DELETE" }, true);
+                              const json = await res.json().catch(() => ({}));
+                              if (!res.ok) throw new Error(json?.message || "Failed to delete category.");
+                              toast.success("Category removed");
+                              await refreshAll();
+                            } catch (err: unknown) {
+                              const message = err instanceof Error ? err.message : String(err);
+                              toast.error(message || "Failed to delete category.");
+                            }
+                          })();
                         }}
                       />
                     </td>
@@ -494,8 +877,24 @@ const ManageProducts = () => {
                           setEditSubOpen(true);
                         }}
                         onDelete={() => {
-                          setSubcategories((s) => s.filter((x) => x.id !== row.id));
-                          toast.success("Sub category removed");
+                          void (async () => {
+                            if (!dataLoaded) {
+                              toast.error("Please wait while data loads.");
+                              return;
+                            }
+                            try {
+                              const backendId = subcategoryBackendIdByRowIdRef.current.get(row.id);
+                              if (!backendId) throw new Error("Sub category not found in mapping.");
+                              const res = await authedFetch(`/api/subcategories/${backendId}`, { method: "DELETE" }, true);
+                              const json = await res.json().catch(() => ({}));
+                              if (!res.ok) throw new Error(json?.message || "Failed to delete sub category.");
+                              toast.success("Sub category removed");
+                              await refreshAll();
+                            } catch (err: unknown) {
+                              const message = err instanceof Error ? err.message : String(err);
+                              toast.error(message || "Failed to delete sub category.");
+                            }
+                          })();
                         }}
                       />
                     </td>
@@ -526,8 +925,24 @@ const ManageProducts = () => {
                           setEditProductOpen(true);
                         }}
                         onDelete={() => {
-                          setProducts((p) => p.filter((x) => x.id !== r.id));
-                          toast.success("Product removed");
+                          void (async () => {
+                            if (!dataLoaded) {
+                              toast.error("Please wait while data loads.");
+                              return;
+                            }
+                            try {
+                              const backendId = productBackendIdByRowIdRef.current.get(r.id);
+                              if (!backendId) throw new Error("Product not found in mapping.");
+                              const res = await authedFetch(`/api/products/${backendId}`, { method: "DELETE" }, true);
+                              const json = await res.json().catch(() => ({}));
+                              if (!res.ok) throw new Error(json?.message || "Failed to delete product.");
+                              toast.success("Product removed");
+                              await refreshAll();
+                            } catch (err: unknown) {
+                              const message = err instanceof Error ? err.message : String(err);
+                              toast.error(message || "Failed to delete product.");
+                            }
+                          })();
                         }}
                       />
                     </td>

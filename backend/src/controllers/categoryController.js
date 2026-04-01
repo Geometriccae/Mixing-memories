@@ -11,7 +11,12 @@ const createCategory = asyncHandler(async (req, res) => {
   const exists = await Category.findOne({ name: name.trim() });
   if (exists) throw new ApiError(409, "Category already exists.");
 
-  const category = await Category.create({ name: name.trim(), description: description || "" });
+  const image = req.file ? `/uploads/${req.file.filename}` : "";
+  const category = await Category.create({
+    name: name.trim(),
+    description: description || "",
+    image,
+  });
   res.status(201).json({ success: true, data: category });
 });
 
@@ -28,6 +33,7 @@ const updateCategory = asyncHandler(async (req, res) => {
 
   if (name) category.name = name.trim();
   if (description !== undefined) category.description = description;
+  if (req.file) category.image = `/uploads/${req.file.filename}`;
   await category.save();
 
   res.json({ success: true, data: category });

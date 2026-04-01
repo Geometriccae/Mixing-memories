@@ -8,15 +8,89 @@ const AdminLogin = () => {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // NOTE: This is demo-only client-side auth. For production, use Lovable Cloud with proper server-side auth.
-    if (username === "admin" && password === "admin") {
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+      const normalizedUsername = username.trim().toLowerCase();
+      const demoTypedPassword = password.trim();
+      const isDemoCredentials = normalizedUsername === "admin" && demoTypedPassword === "admin";
+
+      // Backend requires password length >= 6 (User model minlength).
+      // Your UI demo shows `admin` / `admin` (length 5), so we map to a compatible password
+      // only for the demo flow, without changing the UI.
+      const effectivePassword = isDemoCredentials ? "admin123" : password;
+
+      // Your existing admin UI indicates demo credentials are `admin` / `admin`.
+      // The backend login expects `email`, so map `admin` -> `admin@royaloven.com`.
+      const demoAdminEmail = "admin@royaloven.com";
+      const email = normalizedUsername === "admin" ? demoAdminEmail : username.trim();
+
+      const loginWithEmail = async (loginEmail: string) => {
+        const res = await fetch(`${apiBaseUrl}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: loginEmail, password: effectivePassword }),
+        });
+
+        const json: unknown = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+          throw new Error(msg || "Invalid credentials.");
+        }
+
+        const token: string | undefined = (json as { data?: { token?: string } })?.data?.token;
+        if (!token) throw new Error("Token missing from login response.");
+        return token;
+      };
+
+      const attemptDemoSeed = async () => {
+        // If demo user doesn't exist yet, create an admin account so CRUD can work.
+        const res = await fetch(`${apiBaseUrl}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: "Admin",
+            email: demoAdminEmail,
+            password: effectivePassword,
+            role: "admin",
+          }),
+        });
+
+        // Ignore "already exists"; we just need it to be present.
+        if (!res.ok) {
+          const json: unknown = await res.json().catch(() => ({}));
+          const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+          // Only throw if it's not a normal conflict.
+          if (!msg.toLowerCase().includes("email already exists")) {
+            throw new Error(msg || "Failed to create demo admin.");
+          }
+        }
+      };
+
+      // Try normal login first.
+      let token: string | undefined;
+      try {
+        token = await loginWithEmail(email);
+      } catch (loginErr) {
+        // If user typed demo credentials, seed the admin user then retry.
+        if (isDemoCredentials) {
+          await attemptDemoSeed();
+          token = await loginWithEmail(demoAdminEmail);
+        } else {
+          throw loginErr;
+        }
+      }
+
       sessionStorage.setItem("admin_demo", "true");
+      sessionStorage.setItem("admin_token", token);
+
       toast.success("Welcome back, Admin!");
       navigate("/admin/dashboard");
-    } else {
-      toast.error("Invalid credentials");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(message || "Invalid credentials");
     }
   };
 
