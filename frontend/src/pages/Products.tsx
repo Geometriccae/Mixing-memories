@@ -1,14 +1,36 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
 import SectionHeading from "@/components/common/SectionHeading";
 import ProductCard from "@/components/common/ProductCard";
-import { products } from "@/data/mockData";
-
-const allCategories = ["All", ...new Set(products.map((p) => p.category))];
+import type { Product } from "@/data/mockData";
+import { fetchPublicProducts, mapApiProductToProduct } from "@/lib/catalogApi";
+import goldenJaggeryWhite from "@/assets/royal-oven-golden-jaggery-white.png";
 
 const Products = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const apiProducts = await fetchPublicProducts();
+        if (cancelled) return;
+        const mapped = apiProducts
+          .map((p) => mapApiProductToProduct(p, goldenJaggeryWhite))
+          .filter((p): p is Product => p !== null);
+        setProducts(mapped);
+      } catch {
+        if (!cancelled) setProducts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const allCategories = useMemo(() => ["All", ...new Set(products.map((p) => p.category).filter(Boolean))], [products]);
   const [active, setActive] = useState("All");
   const filtered = active === "All" ? products : products.filter((p) => p.category === active);
 
