@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import heroImg from "@/assets/hero-groceries.jpg";
+import heroImg from "@/assets/hero-choco-crunchy-granola.png";
 import { marqueeItems } from "@/data/mockData";
 
 const HeroSection = () => (
@@ -10,7 +10,7 @@ const HeroSection = () => (
       <div className="container grid lg:grid-cols-2 gap-8 items-center py-12 md:py-20 lg:py-28">
         <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7 }}>
           <span className="inline-block bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6">
-            🎉 Free delivery on orders over $50
+            🎉 Free delivery on orders over ₹50
           </span>
           <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight mb-6">
             Right snack, right now,
@@ -55,7 +55,7 @@ const HeroSection = () => (
           className="relative hidden lg:block"
         >
           <div className="rounded-3xl overflow-hidden shadow-2xl">
-            <img src={heroImg} alt="Fresh groceries" width={1920} height={1080} className="w-full h-auto object-cover" />
+            <img src={heroImg} alt="Royal Oven Choco Crunchy Granola" width={1920} height={1080} className="w-full h-auto object-cover" />
           </div>
         </motion.div>
       </div>

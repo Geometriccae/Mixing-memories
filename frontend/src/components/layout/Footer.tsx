@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MapPin, Phone, Mail, Facebook, Twitter, Instagram } from "lucide-react";
+import { MapPin, Phone, Mail, Facebook, Twitter, Instagram, Globe, Smartphone, FileText } from "lucide-react";
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
 
 const Footer = () => (
@@ -20,7 +20,7 @@ const Footer = () => (
             </span>
           </div>
           <p className="text-sm leading-relaxed mb-6">Your one-stop shop for quality groceries. Fresh produce, artisan bakery, and daily essentials delivered to your door.</p>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {[Facebook, Twitter, Instagram].map((Icon, i) => (
               <a key={i} href="#" className="h-10 w-10 rounded-full bg-background/10 flex items-center justify-center hover:bg-primary transition-colors">
                 <Icon className="h-4 w-4" />
@@ -47,9 +47,55 @@ const Footer = () => (
         <div>
           <h4 className="font-display text-lg font-semibold text-background mb-4">Contact Us</h4>
           <ul className="space-y-3 text-sm">
-            <li className="flex items-start gap-2"><MapPin className="h-4 w-4 mt-0.5 shrink-0" /> 1/1A, First floor, 3rd street, Kamaraj Nagar Main Road, Avadi, Chennai- 600 071.</li>
-            <li className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0" /> +91 98765 43210</li>
-            <li className="flex items-center gap-2"><Mail className="h-4 w-4 shrink-0" /> info@royaloven.com</li>
+            <li className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                No. 1/ 1 First Floor 3rd Street, Kamaraj Nagar Main Road, Avadi, Chennai - 600071
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <Smartphone className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                <a href="tel:+917338843363" className="hover:text-primary transition-colors">
+                  73388 43363
+                </a>
+                <span className="mx-1 text-background/40">·</span>
+                <a href="tel:+919043288812" className="hover:text-primary transition-colors">
+                  90432 88812
+                </a>
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Phone className="h-4 w-4 shrink-0" />
+              <a href="tel:+914447659338" className="hover:text-primary transition-colors">
+                044 - 47659338
+              </a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Mail className="h-4 w-4 shrink-0" />
+              <a href="mailto:mixingmemories2025@gmail.com" className="hover:text-primary transition-colors break-all">
+                mixingmemories2025@gmail.com
+              </a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Globe className="h-4 w-4 shrink-0" />
+              <a
+                href="https://theroyaloven.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                theroyaloven.com
+              </a>
+            </li>
+            <li className="flex items-start gap-2">
+              <FileText className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>GST No: 33ACGFM2172B1ZQ</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <FileText className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>FSSAI No: 12426023000272</span>
+            </li>
           </ul>
         </div>
       </div>

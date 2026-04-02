@@ -30,9 +30,9 @@ const ManageCategories = () => {
   return (
     <div className="space-y-6">
       <h2 className="font-display text-xl font-semibold text-foreground">Manage Categories</h2>
-      <div className="bg-card rounded-2xl p-6 card-shadow flex gap-3">
+      <div className="bg-card rounded-2xl p-6 card-shadow flex flex-col sm:flex-row gap-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Category name" className="flex-1 px-4 py-3 rounded-xl bg-muted border border-border text-foreground outline-none focus:ring-2 focus:ring-primary/30 text-sm" />
-        <button onClick={handleSave} className="bg-primary text-primary-foreground px-6 py-3 rounded-xl text-sm font-medium hover:opacity-90">
+        <button onClick={handleSave} className="bg-primary text-primary-foreground px-6 py-3 rounded-xl text-sm font-medium hover:opacity-90 w-full sm:w-auto">
           {editId ? "Update" : "Add"}
         </button>
       </div>

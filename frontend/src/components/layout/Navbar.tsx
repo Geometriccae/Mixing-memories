@@ -20,8 +20,8 @@ const Navbar = () => {
     <>
       {/* Top bar */}
       <div className="bg-primary text-primary-foreground text-sm py-2">
-        <div className="container flex justify-between items-center">
-          <span>🎉 Flat 50% Off On Grocery Shop — Limited Time!</span>
+        <div className="container flex flex-wrap justify-between items-center gap-2">
+          <span className="min-w-0 break-words">🎉 Flat 50% Off On Grocery Shop — Limited Time!</span>
           <div className="hidden md:flex gap-4 items-center">
             <Link to="/contact" className="hover:underline">Help?</Link>
             <Link to="/admin" className="hover:underline">Admin</Link>
