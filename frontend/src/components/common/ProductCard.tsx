@@ -1,8 +1,11 @@
 import { motion } from "framer-motion";
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Product } from "@/data/mockData";
+import { useCart } from "@/contexts/CartContext";
 
-const ProductCard = ({ product }: { product: Product }) => (
+const ProductCard = ({ product }: { product: Product }) => {
+  const { addToCart } = useCart();
+  return (
   <motion.div
     whileHover={{ y: -6 }}
     className="group bg-card rounded-xl overflow-hidden card-shadow hover:card-shadow-hover transition-shadow duration-300"
@@ -22,7 +25,12 @@ const ProductCard = ({ product }: { product: Product }) => (
         <button className="h-9 w-9 bg-background rounded-full flex items-center justify-center shadow-md hover:bg-primary hover:text-primary-foreground transition-colors">
           <Heart className="h-4 w-4" />
         </button>
-        <button className="h-9 w-9 bg-background rounded-full flex items-center justify-center shadow-md hover:bg-primary hover:text-primary-foreground transition-colors">
+        <button
+          type="button"
+          onClick={() => addToCart(product)}
+          className="h-9 w-9 bg-background rounded-full flex items-center justify-center shadow-md hover:bg-primary hover:text-primary-foreground transition-colors"
+          aria-label="Add to cart"
+        >
           <ShoppingCart className="h-4 w-4" />
         </button>
       </div>
@@ -44,6 +52,7 @@ const ProductCard = ({ product }: { product: Product }) => (
       </div>
     </div>
   </motion.div>
-);
+  );
+};
 
 export default ProductCard;

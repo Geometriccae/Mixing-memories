@@ -3,11 +3,13 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShoppingCart, Heart, User, Menu, X } from "lucide-react";
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
+import { useCart } from "@/contexts/CartContext";
 
 const navLinks = [
   { path: "/", label: "Home" },
   { path: "/categories", label: "Categories" },
   { path: "/products", label: "Products" },
+  { path: "/orders", label: "Orders" },
   { path: "/about", label: "About" },
   { path: "/contact", label: "Contact" },
 ];
@@ -15,6 +17,7 @@ const navLinks = [
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { itemCount } = useCart();
 
   return (
     <>
@@ -80,10 +83,14 @@ const Navbar = () => {
               <Heart className="h-5 w-5 text-foreground" />
               <span className="absolute -top-0.5 -right-0.5 bg-secondary text-secondary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">3</span>
             </button>
-            <button className="relative p-2 hover:bg-muted rounded-full transition-colors">
+            <Link to="/orders" className="relative p-2 hover:bg-muted rounded-full transition-colors">
               <ShoppingCart className="h-5 w-5 text-foreground" />
-              <span className="absolute -top-0.5 -right-0.5 bg-secondary text-secondary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">4</span>
-            </button>
+              {itemCount > 0 ? (
+                <span className="absolute -top-0.5 -right-0.5 bg-secondary text-secondary-foreground text-xs rounded-full min-w-[1rem] h-4 px-0.5 flex items-center justify-center font-bold">
+                  {itemCount > 99 ? "99+" : itemCount}
+                </span>
+              ) : null}
+            </Link>
             <Link to="/admin" className="p-2 hover:bg-muted rounded-full transition-colors hidden md:flex">
               <User className="h-5 w-5 text-foreground" />
             </Link>
