@@ -58,7 +58,7 @@ const AboutSection = () => (
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
-        className="relative"
+        className="relative hidden"
       >
         <div className="grid grid-cols-2 gap-4">
           {[
@@ -67,7 +67,7 @@ const AboutSection = () => (
             { value: "50+", label: "Local Farms" },
             { value: "4.9★", label: "Average Rating" },
           ].map((stat, i) => (
-            <div key={i} className="bg-accent rounded-2xl p-6 text-center">
+            <div key={i} className={`bg-accent rounded-2xl p-6 text-center ${stat.label === 'Happy Customers' ? 'hidden' : ''}`}>
               <p className="text-3xl font-display font-bold text-primary">{stat.value}</p>
               <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
             </div>
