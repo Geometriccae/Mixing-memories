@@ -27,10 +27,10 @@ const HeroSection = () => (
               Shop Now <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              to="/categories"
+              to="/products"
               className="inline-flex items-center gap-2 border-2 border-primary text-primary px-8 py-3.5 rounded-full font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
             >
-              Browse Categories
+              View all products
             </Link>
           </div>
           <div className="flex items-center gap-6 mt-10 hidden">
@@ -60,29 +60,51 @@ const HeroSection = () => (
       </div>
     </section>
 
-    {/* Custom Ticker Items */}
+    {/* Featured offers marquee — light strip, seamless loop (two copies) */}
     {(() => {
       const tickerItems = [
-        { name: "CHOCO CRUNCHY GRANOLA", price: 270, image: chocoTicker },
-        { name: "GULKAND-E-MEWA", price: 300, image: mewaTicker },
+        { name: "Choco Crunchy Granola", price: 270, image: chocoTicker },
+        { name: "Gulkand-e-Mewa", price: 300, image: mewaTicker },
       ];
+      const loop = [...tickerItems, ...tickerItems];
       return (
-        <div className="bg-foreground py-10 md:py-16 overflow-hidden">
-          <div className="marquee flex whitespace-nowrap items-center">
-            {[...tickerItems, ...tickerItems, ...tickerItems, ...tickerItems, ...tickerItems].map((p, i) => (
-              <div key={i} className="flex-shrink-0 inline-flex items-center gap-12 bg-white/20 backdrop-blur-xl rounded-[2.5rem] px-16 py-10 mx-12 border border-white/10 shadow-2xl transition-transform hover:scale-105 duration-500">
-                <img src={p.image} alt={p.name} className="h-40 w-40 md:h-52 md:w-52 object-contain drop-shadow-2xl scale-110" />
-                <div className="flex flex-col gap-2 pr-4">
-                  <span className="text-background font-bold text-3xl md:text-5xl tracking-tighter uppercase whitespace-nowrap leading-none">{p.name}</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-secondary font-black text-4xl md:text-7xl">₹{p.price.toFixed(2)}</span>
-                    <span className="text-background/40 text-lg md:text-xl font-medium tracking-wide">ONLY</span>
+        <section className="relative border-y border-border/70 bg-gradient-to-b from-muted/40 via-background to-muted/30 py-10 md:py-14 overflow-hidden">
+          <div className="container relative mb-6 md:mb-8">
+            <p className="text-center font-display text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Featured picks
+            </p>
+            <p className="text-center text-xs text-muted-foreground/80 mt-1 max-w-md mx-auto">
+              Popular items — same quality, straight from our catalog
+            </p>
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 md:w-24 bg-gradient-to-r from-background to-transparent" aria-hidden />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 md:w-24 bg-gradient-to-l from-background to-transparent" aria-hidden />
+          <div className="marquee flex w-max items-stretch">
+            {loop.map((p, i) => (
+              <div
+                key={`${p.name}-${i}`}
+                className="flex-shrink-0 mx-3 md:mx-5 first:ml-8 last:mr-8 md:first:ml-12 md:last:mr-12"
+              >
+                <div className="flex h-full items-center gap-6 md:gap-10 rounded-2xl border border-border/80 bg-card px-6 py-5 md:px-10 md:py-7 shadow-[0_2px_16px_-4px_hsl(210_11%_15%/0.08)] ring-1 ring-border/40">
+                  <div className="flex h-28 w-28 md:h-36 md:w-36 shrink-0 items-center justify-center rounded-xl bg-muted/50 p-2">
+                    <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1 pr-2 text-left">
+                    <span className="font-display text-lg font-semibold leading-snug text-foreground md:text-2xl md:leading-tight">
+                      {p.name}
+                    </span>
+                    <div className="mt-2 flex flex-wrap items-baseline gap-2">
+                      <span className="font-display text-2xl font-bold tabular-nums text-primary md:text-4xl">
+                        ₹{p.price.toFixed(2)}
+                      </span>
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">in store</span>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       );
     })()}
   </>

@@ -2,6 +2,9 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 
+/** Max upload size (product images). MongoDB document limit is ~16MB for embedded binaries; large files are stored on disk only. */
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+
 const uploadDir = path.resolve(__dirname, "../../uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -27,7 +30,16 @@ function fileFilter(_req, file, cb) {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: MAX_FILE_SIZE },
 });
 
+const memoryStorage = multer.memoryStorage();
+const uploadMemory = multer({
+  storage: memoryStorage,
+  fileFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
+});
+
+upload.uploadMemory = uploadMemory;
+upload.MAX_FILE_SIZE = MAX_FILE_SIZE;
 module.exports = upload;

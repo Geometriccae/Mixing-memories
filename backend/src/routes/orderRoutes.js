@@ -3,6 +3,8 @@ const {
   createOrder,
   listOrders,
   getOrdersByCustomerEmail,
+  getMyOrders,
+  cancelMyOrder,
   updateOrderStatus,
 } = require("../controllers/orderController");
 const { protect } = require("../middleware/authMiddleware");
@@ -10,7 +12,9 @@ const { authorize } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-router.post("/", createOrder);
+router.post("/", protect, createOrder);
+router.patch("/:id/cancel", protect, cancelMyOrder);
+router.get("/my", protect, getMyOrders);
 router.get("/customer", getOrdersByCustomerEmail);
 router.get("/", protect, authorize("admin"), listOrders);
 router.patch("/:id/status", protect, authorize("admin"), updateOrderStatus);

@@ -25,4 +25,22 @@ const protect = asyncHandler(async (req, _res, next) => {
   }
 });
 
-module.exports = { protect };
+/** Sets req.user when Bearer token is valid; otherwise req.user = null (no error). */
+const optionalAuth = asyncHandler(async (req, _res, next) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+  try {
+    const decoded = jwt.verify(token, env.jwtSecret);
+    const user = await User.findById(decoded.id).select("-password");
+    req.user = user || null;
+  } catch {
+    req.user = null;
+  }
+  next();
+});
+
+module.exports = { protect, optionalAuth };

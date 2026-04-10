@@ -11,12 +11,28 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const addressSchema = new mongoose.Schema(
+  {
+    line1: { type: String, trim: true, default: "" },
+    line2: { type: String, trim: true, default: "" },
+    city: { type: String, trim: true, default: "" },
+    state: { type: String, trim: true, default: "" },
+    pincode: { type: String, trim: true, default: "" },
+    country: { type: String, trim: true, default: "India" },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
     customerName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },
     phone: { type: String, default: "", trim: true },
-    address: { type: String, default: "", trim: true },
+    /** Shipping address snapshot at order time */
+    shippingAddress: { type: addressSchema, default: () => ({}) },
+    paymentMethod: { type: String, enum: ["cod", "upi", "online"], default: "cod" },
+    paymentStatus: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
     items: {
       type: [orderItemSchema],
       required: true,
@@ -31,6 +47,10 @@ const orderSchema = new mongoose.Schema(
       enum: ["placed", "shipped", "completed", "cancelled"],
       default: "placed",
     },
+    /** Set when status is cancelled: who initiated */
+    cancelledBy: { type: String, enum: ["user", "admin"], required: false },
+    /** Admin cancellation message shown to the customer (optional for user-initiated cancel) */
+    cancelReason: { type: String, default: "", trim: true, maxlength: 2000 },
   },
   { timestamps: true }
 );
