@@ -1,4 +1,4 @@
-~import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { MapPin, Phone, Mail, Facebook, Twitter, Instagram, Globe, Smartphone, FileText } from "lucide-react";
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
 
@@ -37,11 +37,23 @@ const Footer = () => (
           </ul>
         </div>
         <div>
-          <h4 className="font-display text-lg font-semibold text-background mb-4">Categories</h4>
+          <h4 className="font-display text-lg font-semibold text-background mb-4">Shop</h4>
           <ul className="space-y-2 text-sm">
-            {["CHOCO CRUNCHY GRANOLA", "GULKAND-E-MEWA"].map(c => (
-              <li key={c}><Link to="/products" className="hover:text-primary transition-colors">{c}</Link></li>
-            ))}
+            <li>
+              <Link to="/products" className="hover:text-primary transition-colors">
+                All products
+              </Link>
+            </li>
+            <li>
+              <Link to="/orders" className="hover:text-primary transition-colors">
+                My orders
+              </Link>
+            </li>
+            <li>
+              <Link to="/cart" className="hover:text-primary transition-colors">
+                Cart
+              </Link>
+            </li>
           </ul>
         </div>
         <div>

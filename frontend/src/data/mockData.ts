@@ -8,10 +8,23 @@ import peanutWhite from "@/assets/royal-oven-peanut-power-white.png";
 export interface Product {
   id: string;
   name: string;
-  category: string;
+  category?: string;
+  description?: string;
+  specification?: string;
+  /** Not exposed on public catalog — use availability on checkout */
+  inStock?: boolean;
+  lowStock?: boolean;
+  outOfStock?: boolean;
+  manufacturer?: string;
+  quality?: string;
   price: number;
+  /** MRP / list price (e.g. for strikethrough when higher than selling price) */
   originalPrice?: number;
+  /** Same as list/MRP when you need to show both prices explicitly */
+  actualPrice?: number;
   image: string;
+  /** Extra gallery images (e.g. variants) */
+  variantImageUrls?: string[];
   badge?: string;
   rating: number;
 }

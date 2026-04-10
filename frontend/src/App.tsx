@@ -7,21 +7,26 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { CartProvider } from "./contexts/CartContext";
+import { WishlistProvider } from "./contexts/WishlistContext";
+import { AuthProvider } from "./contexts/AuthContext";
 
-const Categories = lazy(() => import("./pages/Categories"));
 const Products = lazy(() => import("./pages/Products"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Orders = lazy(() => import("./pages/Orders"));
+const Likes = lazy(() => import("./pages/Likes"));
+const Cart = lazy(() => import("./pages/Cart"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const ManageProducts = lazy(() => import("./pages/admin/ManageProducts"));
-const ManageCategories = lazy(() => import("./pages/admin/ManageCategories"));
 const ManageTestimonials = lazy(() => import("./pages/admin/ManageTestimonials"));
 const ManageUsers = lazy(() => import("./pages/admin/ManageUsers"));
 const ManageOrders = lazy(() => import("./pages/admin/ManageOrders"));
 const AdminStub = lazy(() => import("./pages/admin/AdminStub"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Profile = lazy(() => import("./pages/Profile"));
 
 const queryClient = new QueryClient();
 
@@ -37,12 +42,18 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AuthProvider>
         <CartProvider>
+        <WishlistProvider>
         <Suspense fallback={<Loading />}>
           <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/" element={<Index />} />
-            <Route path="/categories" element={<Categories />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/likes" element={<Likes />} />
+            <Route path="/products/:productId" element={<ProductDetail />} />
+            <Route path="/cart" element={<Cart />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
@@ -60,14 +71,15 @@ const App = () => (
               <Route path="/admin/transactions/pending" element={<AdminStub />} />
               <Route path="/admin/master/manufacturer" element={<AdminStub />} />
               <Route path="/admin/master/quality" element={<AdminStub />} />
-              <Route path="/admin/categories" element={<ManageCategories />} />
               <Route path="/admin/testimonials" element={<ManageTestimonials />} />
               <Route path="/admin/users" element={<ManageUsers />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </WishlistProvider>
         </CartProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

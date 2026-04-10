@@ -27,11 +27,11 @@ const AdminLogin = () => {
       const demoAdminEmail = "admin@royaloven.com";
       const email = normalizedUsername === "admin" ? demoAdminEmail : username.trim();
 
-      const loginWithEmail = async (loginEmail: string) => {
+      const loginWithIdentifier = async (identifier: string) => {
         const res = await fetch(`${apiBaseUrl}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: loginEmail, password: effectivePassword }),
+          body: JSON.stringify({ identifier, password: effectivePassword }),
         });
 
         const json: unknown = await res.json().catch(() => ({}));
@@ -72,12 +72,12 @@ const AdminLogin = () => {
       // Try normal login first.
       let token: string | undefined;
       try {
-        token = await loginWithEmail(email);
+        token = await loginWithIdentifier(email);
       } catch (loginErr) {
         // If user typed demo credentials, seed the admin user then retry.
         if (isDemoCredentials) {
           await attemptDemoSeed();
-          token = await loginWithEmail(demoAdminEmail);
+          token = await loginWithIdentifier(demoAdminEmail);
         } else {
           throw loginErr;
         }

@@ -25,6 +25,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartLine[]>([]);
 
   const addToCart = useCallback((product: Product, qty = 1) => {
+    if (product.outOfStock) return;
     const n = Math.max(1, Math.floor(qty));
     setItems((prev) => {
       const i = prev.findIndex((l) => l.productId === product.id);
