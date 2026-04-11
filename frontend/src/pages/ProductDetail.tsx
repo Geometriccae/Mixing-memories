@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Heart, ShoppingCart, Star } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/layout/Navbar";
@@ -16,6 +16,8 @@ import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/P
 
 const ProductDetail = () => {
   const { productId } = useParams<{ productId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { addToCart } = useCart();
   const { isLiked, toggleLike } = useWishlist();
   const { user, token } = useAuth();
@@ -238,7 +240,18 @@ const ProductDetail = () => {
                   <button
                     type="button"
                     disabled={product.outOfStock === true}
-                    onClick={() => setPmOpen(true)}
+                    onClick={() => {
+                      if (!user || !token) {
+                        toast.error("Please log in to place an order.");
+                        navigate("/auth", { state: { from: location.pathname } });
+                        return;
+                      }
+                      if (!addressOk) {
+                        toast.error("Please fill your delivery address in Profile before ordering.");
+                        return;
+                      }
+                      setPmOpen(true);
+                    }}
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background text-foreground font-medium px-6 py-3 hover:bg-muted/50 transition-colors w-full sm:w-auto sm:min-w-[180px] disabled:opacity-50 disabled:pointer-events-none"
                   >
                     Order now

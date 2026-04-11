@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpDown, Eye, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 import SimpleProductCreateDialog from "@/pages/admin/productDialogs/SimpleProductCreateDialog";
 import SimpleProductEditDialog from "@/pages/admin/productDialogs/SimpleProductEditDialog";
 import ProductViewDialog from "@/pages/admin/productDialogs/ProductViewDialog";
@@ -63,6 +64,8 @@ const ManageProducts = () => {
   const [viewProductOpen, setViewProductOpen] = useState(false);
   const [editProductOpen, setEditProductOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<AdminProductRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminProductRow | null>(null);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [products, setProducts] = useState<AdminProductRow[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -382,24 +385,7 @@ const ManageProducts = () => {
                               setSelectedProduct(r);
                               setEditProductOpen(true);
                             }}
-                            onDelete={() => {
-                              void (async () => {
-                                if (!dataLoaded) {
-                                  toast.error("Please wait while data loads.");
-                                  return;
-                                }
-                                try {
-                                  const res = await authedFetch(`/api/products/${r.id}`, { method: "DELETE" }, true);
-                                  const json = await res.json().catch(() => ({}));
-                                  if (!res.ok) throw new Error((json as { message?: string })?.message || "Failed to delete product.");
-                                  toast.success("Product removed");
-                                  await refreshProducts();
-                                } catch (err: unknown) {
-                                  const message = err instanceof Error ? err.message : String(err);
-                                  toast.error(message || "Failed to delete product.");
-                                }
-                              })();
-                            }}
+                            onDelete={() => setDeleteTarget(r)}
                           />
                         </td>
                       </tr>
@@ -447,6 +433,44 @@ const ManageProducts = () => {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleteConfirming) setDeleteTarget(null);
+        }}
+        title="Delete this product?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.name}” will be removed permanently. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        confirming={deleteConfirming}
+        onConfirm={() => {
+          if (!deleteTarget || !dataLoaded) {
+            toast.error("Please wait while data loads.");
+            return;
+          }
+          const id = deleteTarget.id;
+          void (async () => {
+            setDeleteConfirming(true);
+            try {
+              const res = await authedFetch(`/api/products/${id}`, { method: "DELETE" }, true);
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error((json as { message?: string })?.message || "Failed to delete product.");
+              toast.success("Product removed");
+              setDeleteTarget(null);
+              await refreshProducts();
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              toast.error(message || "Failed to delete product.");
+            } finally {
+              setDeleteConfirming(false);
+            }
+          })();
+        }}
+      />
     </>
   );
 };

@@ -1,16 +1,51 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
-const STORAGE_KEY = "royal_oven_liked_product_ids";
+const LEGACY_LIKES_KEY = "royal_oven_liked_product_ids";
 
-function readStoredIds(): string[] {
+function likesKey(userId: string) {
+  return `royal_oven_likes_v1_${userId}`;
+}
+
+function parseIds(raw: string | null): string[] {
+  if (!raw) return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((x): x is string => typeof x === "string" && x.length > 0);
   } catch {
     return [];
+  }
+}
+
+function readLikes(userId: string): string[] {
+  const k = likesKey(userId);
+  let raw = localStorage.getItem(k);
+  if (!raw && userId !== "guest") {
+    const leg = localStorage.getItem(LEGACY_LIKES_KEY);
+    if (leg) {
+      localStorage.setItem(k, leg);
+      localStorage.removeItem(LEGACY_LIKES_KEY);
+      raw = leg;
+    }
+  }
+  return parseIds(raw);
+}
+
+function saveLikes(userId: string, ids: string[]) {
+  try {
+    localStorage.setItem(likesKey(userId), JSON.stringify(ids));
+  } catch {
+    /* quota */
   }
 }
 
@@ -24,15 +59,37 @@ type WishlistContextValue = {
 const WishlistContext = createContext<WishlistContextValue | null>(null);
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const [likedIds, setLikedIds] = useState<string[]>(() => readStoredIds());
+  const { user, isLoading } = useAuth();
+  const userId = !isLoading ? (user?.id ?? "guest") : null;
+
+  const [likedIds, setLikedIds] = useState<string[]>([]);
+  const prevUserRef = useRef<string | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(likedIds));
-    } catch {
-      /* ignore quota */
-    }
-  }, [likedIds]);
+    if (isLoading || userId === null) return;
+
+    setLikedIds((current) => {
+      const prev = prevUserRef.current;
+
+      if (prev === null) {
+        prevUserRef.current = userId;
+        return readLikes(userId);
+      }
+
+      if (prev !== userId) {
+        saveLikes(prev, current);
+        prevUserRef.current = userId;
+        return readLikes(userId);
+      }
+
+      return current;
+    });
+  }, [isLoading, userId]);
+
+  useEffect(() => {
+    if (isLoading || userId === null) return;
+    saveLikes(userId, likedIds);
+  }, [likedIds, userId, isLoading]);
 
   const isLiked = useCallback(
     (productId: string) => likedIds.includes(productId),

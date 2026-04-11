@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { Eye } from "lucide-react";
+import { Eye, FileDown } from "lucide-react";
 import { fetchAdminOrders, patchOrderStatus, type OrderDoc } from "@/lib/orderApi";
+import { downloadOrderInvoicePdf, orderDisplayId, orderStatusLabel, paymentStatusLabel } from "@/lib/orderInvoicePdf";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const STATUS_OPTIONS = ["placed", "shipped", "completed", "cancelled"] as const;
@@ -46,7 +47,7 @@ const ManageOrders = () => {
     }
     setLoading(true);
     try {
-      const list = await fetchAdminOrders(token, statusQuery);
+      const list = await fetchAdminOrders(token, { orderStatus: statusQuery ?? undefined });
       setOrders(list);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -80,6 +81,11 @@ const ManageOrders = () => {
       }
     })();
   };
+
+  const dialogOrder = useMemo(() => {
+    if (!selected) return null;
+    return orders.find((x) => x._id === selected._id) ?? selected;
+  }, [selected, orders]);
 
   const submitAdminCancel = () => {
     if (!token || !adminCancelOrderId) return;
@@ -132,6 +138,7 @@ const ManageOrders = () => {
               <thead>
                 <tr>
                   <th className={thClass}>Date</th>
+                  <th className={thClass}>Order ID</th>
                   <th className={thClass}>Customer</th>
                   <th className={thClass}>Email</th>
                   <th className={thClass}>Items</th>
@@ -145,6 +152,9 @@ const ManageOrders = () => {
                   <tr key={o._id} className={`border-b border-border ${idx % 2 === 1 ? "bg-muted/35" : "bg-card"}`}>
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {o.createdAt ? new Date(o.createdAt).toLocaleString() : "—"}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-foreground whitespace-nowrap">
+                      {orderDisplayId(o)}
                     </td>
                     <td className="px-4 py-3 font-medium text-foreground">{o.customerName}</td>
                     <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">{o.email}</td>
@@ -198,32 +208,70 @@ const ManageOrders = () => {
       >
         <DialogContent className="max-w-2xl">
           <div className="space-y-4">
-            <div>
-              <p className="text-base font-semibold text-foreground">Order details</p>
-              <p className="text-sm text-muted-foreground mt-1">{selected?._id}</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-semibold text-foreground">Order details</p>
+                {dialogOrder ? (
+                  <>
+                    <p className="text-sm font-mono font-semibold text-primary mt-1">{orderDisplayId(dialogOrder)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 break-all">Ref: {dialogOrder._id}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">—</p>
+                )}
+              </div>
+              {dialogOrder ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await downloadOrderInvoicePdf(dialogOrder);
+                        toast.success("Invoice downloaded (current status)");
+                      } catch {
+                        toast.error("Could not generate invoice.");
+                      }
+                    })();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-2 text-sm font-semibold hover:bg-primary/10"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Download invoice PDF
+                </button>
+              ) : null}
             </div>
 
-            {selected ? (
+            {dialogOrder ? (
               <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">Customer</p>
-                    <p className="font-medium text-foreground">{selected.customerName}</p>
-                    <p className="text-muted-foreground">{selected.email}</p>
-                    <p className="text-muted-foreground">{selected.phone || "—"}</p>
+                    <p className="font-medium text-foreground">{dialogOrder.customerName}</p>
+                    <p className="text-muted-foreground">{dialogOrder.email}</p>
+                    <p className="text-muted-foreground">{dialogOrder.phone || "—"}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Delivery address</p>
-                    <p className="font-medium text-foreground">{addressLine(selected)}</p>
+                    <p className="font-medium text-foreground">{addressLine(dialogOrder)}</p>
                     <p className="text-muted-foreground mt-2">
-                      Payment: {selected.paymentMethod ? String(selected.paymentMethod).toUpperCase() : "—"}{" "}
-                      {selected.paymentStatus ? `• ${String(selected.paymentStatus)}` : ""}
+                      Payment: {dialogOrder.paymentMethod ? String(dialogOrder.paymentMethod).toUpperCase() : "—"}
+                      {dialogOrder.paymentStatus != null ? (
+                        <>
+                          {" "}
+                          •{" "}
+                          <span className="font-medium text-foreground">
+                            {paymentStatusLabel(dialogOrder.paymentStatus)}
+                          </span>
+                        </>
+                      ) : null}
                     </p>
-                    <p className="text-muted-foreground">Status: {selected.status}</p>
-                    {selected.status === "cancelled" && selected.cancelReason?.trim() ? (
+                    <p className="text-muted-foreground">
+                      Status: <span className="font-medium text-foreground">{orderStatusLabel(dialogOrder.status)}</span>
+                    </p>
+                    {dialogOrder.status === "cancelled" && dialogOrder.cancelReason?.trim() ? (
                       <p className="text-sm text-foreground mt-2">
                         <span className="text-muted-foreground">Customer-facing reason: </span>
-                        {selected.cancelReason.trim()}
+                        {dialogOrder.cancelReason.trim()}
                       </p>
                     ) : null}
                   </div>
@@ -232,7 +280,7 @@ const ManageOrders = () => {
                 <div className="border-t border-border pt-3">
                   <p className="text-sm font-medium text-foreground mb-2">Items</p>
                   <ul className="space-y-2">
-                    {selected.items.map((it, i) => (
+                    {dialogOrder.items.map((it, i) => (
                       <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/60 p-3">
                         <div className="flex items-center gap-3 min-w-0">
                           {it.image ? (
@@ -251,6 +299,9 @@ const ManageOrders = () => {
                       </li>
                     ))}
                   </ul>
+                  <p className="text-right text-sm font-semibold text-foreground pt-2 border-t border-border mt-3">
+                    Total ₹{Number(dialogOrder.totalAmount).toFixed(2)}
+                  </p>
                 </div>
               </div>
             ) : (

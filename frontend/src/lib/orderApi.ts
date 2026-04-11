@@ -34,6 +34,8 @@ export type OrderItemDoc = {
 
 export type OrderDoc = {
   _id: string;
+  /** Friendly order id for invoices (from server) */
+  orderNumber?: string;
   userId?: string | null;
   customerName: string;
   email: string;
@@ -97,9 +99,28 @@ export async function fetchMyOrders(token: string): Promise<OrderDoc[]> {
   return Array.isArray(data) ? (data as OrderDoc[]) : [];
 }
 
-export async function fetchAdminOrders(token: string, status?: string | null): Promise<OrderDoc[]> {
+export type AdminOrderFilters = {
+  orderStatus?: string | null;
+  paymentStatus?: string | null;
+};
+
+export async function fetchAdminOrders(
+  token: string,
+  filters?: AdminOrderFilters | string | null,
+): Promise<OrderDoc[]> {
   const base = `${apiBaseUrl()}/api/orders`;
-  const url = status ? `${base}?status=${encodeURIComponent(status)}` : base;
+  let orderStatus: string | undefined;
+  let paymentStatus: string | undefined;
+  if (typeof filters === "string") orderStatus = filters;
+  else if (filters && typeof filters === "object") {
+    orderStatus = filters.orderStatus ?? undefined;
+    paymentStatus = filters.paymentStatus ?? undefined;
+  }
+  const params = new URLSearchParams();
+  if (orderStatus) params.set("status", orderStatus);
+  if (paymentStatus) params.set("paymentStatus", paymentStatus);
+  const q = params.toString();
+  const url = q ? `${base}?${q}` : base;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -110,6 +131,22 @@ export async function fetchAdminOrders(token: string, status?: string | null): P
   }
   const data = (json as { data?: unknown }).data;
   return Array.isArray(data) ? (data as OrderDoc[]) : [];
+}
+
+export async function patchOrderPaymentStatus(token: string, orderId: string, paymentStatus: string): Promise<void> {
+  const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/payment-status`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ paymentStatus }),
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Failed to update payment status.");
+  }
 }
 
 export async function patchOrderStatus(
