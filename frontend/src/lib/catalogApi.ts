@@ -15,7 +15,10 @@ export type ApiProductDoc = {
   inStock?: boolean;
   lowStock?: boolean;
   outOfStock?: boolean;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  hasImage?: boolean;
+  hasVideo?: boolean;
   image?: string;
   updatedAt?: string;
   variantImageUrls?: (string | null)[];
@@ -71,6 +74,7 @@ export async function fetchProductsAvailability(productIds: string[]): Promise<R
 }
 
 function resolveProductImageUrl(p: ApiProductDoc): string {
+  if (p.hasImage === false) return "";
   const id = p._id ? String(p._id) : "";
   if (p.imageUrl && p.imageUrl.startsWith("/")) {
     return `${apiBaseUrl()}${p.imageUrl}`;
@@ -78,9 +82,22 @@ function resolveProductImageUrl(p: ApiProductDoc): string {
   if (p.image && p.image.startsWith("/uploads/")) {
     return `${apiBaseUrl()}${p.image}`;
   }
-  if (id) {
+  if (id && p.hasImage !== false) {
     const ts = p.updatedAt ? new Date(p.updatedAt).getTime() : Date.now();
     return `${apiBaseUrl()}/api/products/${id}/image?v=${ts}`;
+  }
+  return "";
+}
+
+function resolveProductVideoUrl(p: ApiProductDoc): string {
+  if (p.hasVideo !== true) return "";
+  const id = p._id ? String(p._id) : "";
+  if (p.videoUrl && p.videoUrl.startsWith("/")) {
+    return `${apiBaseUrl()}${p.videoUrl}`;
+  }
+  if (id) {
+    const ts = p.updatedAt ? new Date(p.updatedAt).getTime() : Date.now();
+    return `${apiBaseUrl()}/api/products/${id}/video?v=${ts}`;
   }
   return "";
 }
@@ -102,6 +119,7 @@ export function mapApiProductToProduct(p: ApiProductDoc, fallbackImage: string):
   const price = Number(p.price);
   if (!Number.isFinite(price)) return null;
   const img = resolveProductImageUrl(p);
+  const vid = resolveProductVideoUrl(p);
   const actual =
     p.actualPrice !== undefined && p.actualPrice !== null && String(p.actualPrice).trim() !== ""
       ? Number(p.actualPrice)
@@ -125,6 +143,8 @@ export function mapApiProductToProduct(p: ApiProductDoc, fallbackImage: string):
     actualPrice: hasActual ? actual : undefined,
     originalPrice: hasActual && actual > price ? actual : undefined,
     image: img || fallbackImage,
+    hasCoverImage: p.hasImage !== false && img.length > 0,
+    videoUrl: vid || undefined,
     variantImageUrls: variants.length ? variants : undefined,
     rating: 4.8,
   };

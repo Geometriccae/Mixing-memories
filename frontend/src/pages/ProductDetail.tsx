@@ -50,7 +50,8 @@ const ProductDetail = () => {
         const mapped = doc ? mapApiProductToProduct(doc, goldenJaggeryWhite) : null;
         setProduct(mapped);
         if (mapped) {
-          setActiveImage(mapped.image);
+          const start = mapped.hasCoverImage === false && mapped.videoUrl ? mapped.videoUrl : mapped.image;
+          setActiveImage(start);
           setImageLoading(true);
         }
       } catch {
@@ -65,10 +66,15 @@ const ProductDetail = () => {
   }, [productId]);
 
   const thumbs = product
-    ? [product.image, ...(product.variantImageUrls || [])].filter((u, i, a) => u && a.indexOf(u) === i)
+    ? [
+        ...(product.hasCoverImage === false ? [] : [product.image]),
+        ...(product.variantImageUrls || []),
+        ...(product.videoUrl ? [product.videoUrl] : []),
+      ].filter((u, i, a) => u && a.indexOf(u) === i)
     : [];
 
   const mainSrc = activeImage || product?.image || "";
+  const mainIsVideo = Boolean(product?.videoUrl && mainSrc === product.videoUrl);
 
   const handleOrderNow = async () => {
     if (!product) return;
@@ -133,22 +139,35 @@ const ProductDetail = () => {
             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-start">
               <div className="space-y-3 max-w-xl mx-auto w-full">
                     <div className="rounded-xl overflow-hidden border border-border bg-muted aspect-square relative">
-                  <img
-                        src={mainSrc}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                        onLoad={() => setImageLoading(false)}
-                        onError={() => setImageLoading(false)}
-                  />
+                      {mainIsVideo ? (
+                        <video
+                          src={mainSrc}
+                          controls
+                          className="w-full h-full object-contain bg-black"
+                          onLoadedData={() => setImageLoading(false)}
+                          onError={() => setImageLoading(false)}
+                        />
+                      ) : (
+                        <img
+                          src={mainSrc}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                          onLoad={() => setImageLoading(false)}
+                          onError={() => setImageLoading(false)}
+                        />
+                      )}
                       {imageLoading ? (
                         <div className="absolute inset-0 bg-background/40 backdrop-blur-[1px] flex items-center justify-center">
                           <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                         </div>
                       ) : null}
-                </div>
+                    </div>
                 {thumbs.length > 1 ? (
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {thumbs.map((url) => (
+                    {thumbs.map((url) => {
+                      const isVid = product.videoUrl === url;
+                      const isActive = (activeImage || product.image) === url;
+                      return (
                       <button
                         key={url}
                         type="button"
@@ -157,12 +176,16 @@ const ProductDetail = () => {
                               setActiveImage(url);
                             }}
                         className={`h-16 w-16 rounded-lg border overflow-hidden shrink-0 ${
-                          (activeImage || product.image) === url ? "ring-2 ring-primary ring-offset-2" : "border-border"
+                          isActive ? "ring-2 ring-primary ring-offset-2" : "border-border"
                         }`}
                       >
-                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        {isVid ? (
+                          <video src={url} className="w-full h-full object-cover bg-black" muted playsInline preload="metadata" />
+                        ) : (
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        )}
                       </button>
-                    ))}
+                    );})}
                   </div>
                 ) : null}
               </div>

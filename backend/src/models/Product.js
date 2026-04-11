@@ -17,6 +17,12 @@ const productSchema = new mongoose.Schema(
     /** Main product image — stored only in MongoDB (no uploads/ file) */
     imageData: { type: Buffer, default: undefined },
     imageContentType: { type: String, default: "image/jpeg" },
+    /** Optional short product video (same document size limits as images) */
+    videoData: { type: Buffer, default: undefined },
+    videoContentType: { type: String, default: "video/mp4" },
+    /** Denormalized for list JSON without loading Buffer fields */
+    hasImage: { type: Boolean },
+    hasVideo: { type: Boolean },
     /** @deprecated Legacy disk path; new products leave this empty */
     image: { type: String, default: "" },
     /** @deprecated Legacy variant paths under /uploads/ — new products use variantImageData* */

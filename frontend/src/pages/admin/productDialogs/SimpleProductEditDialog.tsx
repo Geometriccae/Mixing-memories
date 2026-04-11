@@ -21,8 +21,11 @@ export type UpdateProductPayload = {
   stock: number;
   minStock: number;
   imageDataUrl: string | null;
+  /** New video file to replace current */
+  videoFile: File | null;
   variantImageDataUrls: [string | null, string | null, string | null];
   removeMainImage?: boolean;
+  removeVideo?: boolean;
   removeVariants?: [boolean, boolean, boolean];
 };
 
@@ -44,6 +47,10 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
   const [mainFileLabel, setMainFileLabel] = useState("No file chosen");
   const [mainImage, setMainImage] = useState<string | null>(null);
   const [removeMainImage, setRemoveMainImage] = useState(false);
+  const [removeVideo, setRemoveVideo] = useState(false);
+  const [videoLabel, setVideoLabel] = useState("Keep current");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const [removeVariants, setRemoveVariants] = useState<[boolean, boolean, boolean]>([false, false, false]);
   const [isSaving, setIsSaving] = useState(false);
   const mainInputRef = useRef<HTMLInputElement | null>(null);
@@ -54,6 +61,17 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
     null,
     null,
   ]);
+  const [newVideoObjectUrl, setNewVideoObjectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!videoFile) {
+      setNewVideoObjectUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(videoFile);
+    setNewVideoObjectUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [videoFile]);
 
   useEffect(() => {
     if (!product || !open) return;
@@ -67,6 +85,10 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
     setMainFileLabel("No file chosen");
     setMainImage(null);
     setRemoveMainImage(false);
+    setRemoveVideo(false);
+    setVideoLabel("Keep current");
+    setVideoFile(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
     setVariantLabels(["Keep current", "Keep current", "Keep current"]);
     setVariantPreviews([
       product.variantImageUrls[0] ?? null,
@@ -119,6 +141,32 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
     setRemoveMainImage(false);
   };
 
+  const clearVideo = () => {
+    if (!window.confirm("Remove the product video?")) return;
+    setVideoLabel("No file chosen");
+    setVideoFile(null);
+    setRemoveVideo(true);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  };
+
+  const handleVideoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setVideoLabel("Keep current");
+      setVideoFile(null);
+      return;
+    }
+    if (!file.type.startsWith("video/")) {
+      setVideoLabel("Keep current");
+      setVideoFile(null);
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+    setVideoLabel(file.name);
+    setVideoFile(file);
+    setRemoveVideo(false);
+  };
+
   const handleVariantFile = async (index: 0 | 1 | 2, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setVariantLabels((prev) => {
@@ -148,6 +196,8 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
   };
 
   const displayMain = mainImage ?? product?.imageUrl ?? "";
+  const showVideoPreview = product?.hasVideo && !removeVideo;
+  const videoDisplaySrc = newVideoObjectUrl || (showVideoPreview ? product?.videoUrl ?? "" : "");
 
   const handleSubmit = async () => {
     if (!product) return;
@@ -184,8 +234,10 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
         stock: st,
         minStock: minS,
         imageDataUrl: mainImage,
+        videoFile,
         variantImageDataUrls,
         removeMainImage,
+        removeVideo,
         removeVariants,
       });
       onOpenChange(false);
@@ -293,6 +345,33 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
                       <X className="h-4 w-4" />
                     </button>
                   ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1.5">
+                Short product video (leave unchanged to keep current)
+              </label>
+              <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoFile} className="text-sm" />
+              <p className="text-xs text-muted-foreground mt-1">{videoLabel}</p>
+              {videoDisplaySrc ? (
+                <div className="relative mt-2 inline-block max-w-[220px]">
+                  <video
+                    src={videoDisplaySrc}
+                    className="h-24 w-full rounded object-cover border border-border bg-black"
+                    muted
+                    playsInline
+                    controls
+                  />
+                  <button
+                    type="button"
+                    onClick={clearVideo}
+                    className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted"
+                    aria-label="Remove video"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               ) : null}
             </div>

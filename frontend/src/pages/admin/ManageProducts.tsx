@@ -51,7 +51,10 @@ type ApiProduct = {
   actualPrice?: number | null;
   stock?: number;
   minStock?: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  hasImage?: boolean;
+  hasVideo?: boolean;
   updatedAt?: string;
   variantImageUrls?: (string | null)[];
 };
@@ -119,7 +122,18 @@ const ManageProducts = () => {
       const price = Number(p.price);
       if (!Number.isFinite(price)) return null;
       const ts = p.updatedAt ? new Date(p.updatedAt).getTime() : Date.now();
-      const imageUrl = `${apiBaseUrl}/api/products/${id}/image?v=${ts}`;
+      const hasImageFlag = p.hasImage === true || (p.hasImage !== false && p.imageUrl != null && p.imageUrl !== "");
+      const imageUrl = hasImageFlag
+        ? p.imageUrl && typeof p.imageUrl === "string" && p.imageUrl.startsWith("/")
+          ? `${apiBaseUrl}${p.imageUrl}`
+          : `${apiBaseUrl}/api/products/${id}/image?v=${ts}`
+        : "";
+      const hasVideoFlag = p.hasVideo === true;
+      const videoUrl = hasVideoFlag
+        ? p.videoUrl && typeof p.videoUrl === "string" && p.videoUrl.startsWith("/")
+          ? `${apiBaseUrl}${p.videoUrl}`
+          : `${apiBaseUrl}/api/products/${id}/video?v=${ts}`
+        : "";
       const ap =
         p.actualPrice !== undefined && p.actualPrice !== null && Number.isFinite(Number(p.actualPrice))
           ? Number(p.actualPrice)
@@ -145,6 +159,9 @@ const ManageProducts = () => {
         stock,
         minStock,
         imageUrl,
+        videoUrl,
+        hasImage: Boolean(hasImageFlag && imageUrl),
+        hasVideo: Boolean(hasVideoFlag && videoUrl),
         variantImageUrls,
       };
     },
@@ -210,8 +227,6 @@ const ManageProducts = () => {
             throw new Error("Not authorized");
           }
 
-          const imageBlob = await toBlob(data.imageDataUrl);
-          const imageExt = imageBlob.type.split("/")[1] || "png";
           const form = new FormData();
           form.append("name", data.name);
           form.append("description", data.description || "");
@@ -220,7 +235,12 @@ const ManageProducts = () => {
           if (data.actualPrice != null) form.append("actualPrice", String(data.actualPrice));
           form.append("stock", String(data.stock));
           form.append("minStock", String(data.minStock));
-          form.append("image", imageBlob, `product-image.${imageExt}`);
+          if (data.coverFile) {
+            form.append("image", data.coverFile, data.coverFile.name || "cover");
+          }
+          if (data.videoFile) {
+            form.append("video", data.videoFile, data.videoFile.name || "clip");
+          }
           await appendVariantFiles(form, data.variantImageDataUrls);
 
           const res = await authedFetch("/api/products", { method: "POST", body: form }, true);
@@ -261,6 +281,10 @@ const ManageProducts = () => {
             form.append("image", imageBlob, `product-image.${imageExt}`);
           }
           if (data.removeMainImage) form.append("removeMainImage", "1");
+          if (data.removeVideo) form.append("removeVideo", "1");
+          if (data.videoFile) {
+            form.append("video", data.videoFile, data.videoFile.name || "clip");
+          }
           if (data.removeVariants) {
             data.removeVariants.forEach((flag, i) => {
               if (flag) form.append(`removeVariant${i}`, "1");
@@ -368,7 +392,19 @@ const ManageProducts = () => {
                         <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{start + idx + 1}</td>
                         <td className="px-4 py-3 text-foreground max-w-[280px]">{r.name}</td>
                         <td className="px-4 py-3">
-                          <img src={r.imageUrl} alt="" className="h-12 w-12 rounded object-cover border border-border" />
+                          {r.hasImage ? (
+                            <img src={r.imageUrl} alt="" className="h-12 w-12 rounded object-cover border border-border" />
+                          ) : r.hasVideo ? (
+                            <video
+                              src={r.videoUrl}
+                              className="h-12 w-12 rounded object-cover border border-border bg-black"
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 rounded border border-dashed border-border bg-muted/50" aria-hidden />
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center tabular-nums">₹{r.price.toFixed(2)}</td>
                         <td className={`px-4 py-3 text-center tabular-nums font-medium ${stockLow ? "text-destructive" : ""}`}>

@@ -20,7 +20,10 @@ export type CreateProductPayload = {
   actualPrice: number | null;
   stock: number;
   minStock: number;
-  imageDataUrl: string;
+  /** Cover image file (optional if videoFile is set) */
+  coverFile: File | null;
+  /** Short product video (optional if coverFile is set) */
+  videoFile: File | null;
   variantImageDataUrls: [string | null, string | null, string | null];
 };
 
@@ -38,9 +41,14 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
   const [actualPrice, setActualPrice] = useState("");
   const [stock, setStock] = useState("");
   const [minStock, setMinStock] = useState("");
-  const [mainFileLabel, setMainFileLabel] = useState("No file chosen");
-  const [mainImage, setMainImage] = useState<string | null>(null);
-  const mainInputRef = useRef<HTMLInputElement | null>(null);
+  const [coverLabel, setCoverLabel] = useState("No file chosen");
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const [videoLabel, setVideoLabel] = useState("No file chosen");
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const variantInputRefs = useRef<Array<HTMLInputElement | null>>([null, null, null]);
   const [variantLabels, setVariantLabels] = useState<[string, string, string]>(["No file", "No file", "No file"]);
   const [variantPreviews, setVariantPreviews] = useState<[string | null, string | null, string | null]>([
@@ -59,19 +67,40 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
       setActualPrice("");
       setStock("");
       setMinStock("");
-      setMainFileLabel("No file chosen");
-      setMainImage(null);
+      setCoverLabel("No file chosen");
+      setCoverPreview(null);
+      setCoverFile(null);
+      setVideoLabel("No file chosen");
+      setVideoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setVideoFile(null);
       setVariantLabels(["No file", "No file", "No file"]);
       setVariantPreviews([null, null, null]);
       setIsSaving(false);
     }
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    };
+  }, [videoPreviewUrl]);
+
   const handleBack = () => onOpenChange(false);
-  const clearMainImage = () => {
-    setMainFileLabel("No file chosen");
-    setMainImage(null);
-    if (mainInputRef.current) mainInputRef.current.value = "";
+  const clearCover = () => {
+    setCoverLabel("No file chosen");
+    setCoverPreview(null);
+    setCoverFile(null);
+    if (coverInputRef.current) coverInputRef.current.value = "";
+  };
+  const clearVideo = () => {
+    setVideoLabel("No file chosen");
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    setVideoFile(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
   };
   const clearVariantImage = (index: 0 | 1 | 2) => {
     setVariantLabels((prev) => {
@@ -88,15 +117,36 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
     if (ref) ref.value = "";
   };
 
-  const handleMainFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      setMainFileLabel("No file chosen");
-      setMainImage(null);
+      clearCover();
       return;
     }
-    setMainFileLabel(file.name);
-    setMainImage(await readFileAsDataUrl(file));
+    if (!file.type.startsWith("image/")) {
+      clearCover();
+      return;
+    }
+    setCoverLabel(file.name);
+    setCoverFile(file);
+    setCoverPreview(await readFileAsDataUrl(file));
+  };
+
+  const handleVideoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      clearVideo();
+      return;
+    }
+    if (!file.type.startsWith("video/")) {
+      clearVideo();
+      return;
+    }
+    setVideoLabel(file.name);
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    const url = URL.createObjectURL(file);
+    setVideoPreviewUrl(url);
+    setVideoFile(file);
   };
 
   const handleVariantFile = async (index: 0 | 1 | 2, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,7 +176,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
     const trimmed = name.trim();
     const p = Number(price);
     if (!trimmed || !Number.isFinite(p) || p < 0) return;
-    if (!mainImage) return;
+    if (!coverFile && !videoFile) return;
 
     let ap: number | null = null;
     if (actualPrice.trim() !== "") {
@@ -150,7 +200,8 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
         actualPrice: ap,
         stock: st,
         minStock: minS,
-        imageDataUrl: mainImage,
+        coverFile,
+        videoFile,
         variantImageDataUrls: [...variantPreviews],
       });
       onOpenChange(false);
@@ -241,23 +292,52 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
                   onChange={(e) => setMinStock(e.target.value)}
                   className="w-full rounded-md border border-border px-3 py-2.5 text-sm text-foreground bg-background outline-none focus:ring-2 focus:ring-primary/20"
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">Table turns red when stock ≤ this value.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1.5">Product Image</label>
-                <input ref={mainInputRef} type="file" accept="image/*" onChange={(e) => void handleMainFile(e)} className="text-sm" />
-                <p className="text-xs text-muted-foreground mt-1">{mainFileLabel}</p>
-                {mainImage ? (
+                <label className="block text-xs text-muted-foreground mb-1.5">Cover image</label>
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => void handleCoverFile(e)}
+                  className="text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">{coverLabel}</p>
+                {coverPreview ? (
                   <div className="relative mt-2 inline-block">
-                    <img src={mainImage} alt="" className="h-20 w-20 rounded object-cover border border-border" />
+                    <img src={coverPreview} alt="" className="h-20 w-20 rounded object-cover border border-border" />
                     <button
                       type="button"
-                      onClick={clearMainImage}
+                      onClick={clearCover}
                       className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted"
                       aria-label="Remove image"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1.5">Short product video (optional)</label>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => handleVideoFile(e)}
+                  className="text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">{videoLabel}</p>
+                {videoPreviewUrl ? (
+                  <div className="relative mt-2 inline-block max-w-[200px]">
+                    <video src={videoPreviewUrl} className="h-24 w-full rounded object-cover border border-border" muted playsInline controls />
+                    <button
+                      type="button"
+                      onClick={clearVideo}
+                      className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted"
+                      aria-label="Remove video"
                     >
                       <X className="h-4 w-4" />
                     </button>

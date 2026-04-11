@@ -17,12 +17,24 @@ const ProductCard = ({ product }: { product: Product }) => {
     >
       <Link to={`/products/${product.id}`} className="block text-left">
         <div className="relative overflow-hidden aspect-square bg-muted">
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-          />
+          {product.hasCoverImage === false && product.videoUrl ? (
+            <video
+              src={product.videoUrl}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              muted
+              playsInline
+              loop
+              preload="metadata"
+              aria-label={product.name}
+            />
+          ) : (
+            <img
+              src={product.image}
+              alt={product.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+            />
+          )}
           {product.outOfStock ? (
             <span className="absolute top-3 left-3 text-xs font-semibold px-3 py-1 rounded-full bg-destructive text-destructive-foreground">
               Out of stock

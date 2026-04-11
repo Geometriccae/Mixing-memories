@@ -9,7 +9,12 @@ export type AdminProductRow = {
   actualPrice: number | null;
   stock: number;
   minStock: number;
+  /** Absolute URL when product has a cover image in DB */
   imageUrl: string;
+  /** Absolute URL when product has a video in DB */
+  videoUrl: string;
+  hasImage: boolean;
+  hasVideo: boolean;
   /** Up to 3 resolved URLs (null if no image) */
   variantImageUrls: (string | null)[];
 };
