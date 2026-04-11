@@ -8,7 +8,7 @@ import SectionHeading from "@/components/common/SectionHeading";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { cancelMyOrder, fetchMyOrders, type OrderDoc } from "@/lib/orderApi";
-import { downloadOrderInvoicePdf, orderDisplayId, paymentStatusLabel } from "@/lib/orderInvoicePdf";
+import { canDownloadOrderInvoice, downloadOrderInvoicePdf, orderDisplayId, paymentStatusLabel } from "@/lib/orderInvoicePdf";
 import { toast } from "sonner";
 
 const Orders = () => {
@@ -135,23 +135,24 @@ const Orders = () => {
                         <span className="text-muted-foreground text-right">
                           Status: <span className="font-medium text-foreground">{statusLabel(o.status)}</span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void (async () => {
+                        {canDownloadOrderInvoice(o) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
                               try {
-                                await downloadOrderInvoicePdf(o);
+                                downloadOrderInvoicePdf(o);
                                 toast.success("Invoice downloaded");
-                              } catch {
-                                toast.error("Could not generate invoice.");
+                              } catch (err) {
+                                const msg = err instanceof Error ? err.message : "Could not generate invoice.";
+                                toast.error(msg);
                               }
-                            })();
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/10 transition-colors"
-                        >
-                          <FileDown className="h-3.5 w-3.5" />
-                          Download invoice
-                        </button>
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/10 transition-colors"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                            Download invoice
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 

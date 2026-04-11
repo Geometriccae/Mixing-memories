@@ -64,7 +64,7 @@ async function allocateOrderNumber() {
     const mo = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const orderNumber = `RO-${y}${mo}${day}-${rand}`;
+    const orderNumber = `MM-${y}${mo}${day}-${rand}`;
     const exists = await Order.findOne({ orderNumber }).select("_id").lean();
     if (!exists) return orderNumber;
   }

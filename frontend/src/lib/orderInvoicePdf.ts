@@ -1,8 +1,10 @@
 import { jsPDF } from "jspdf";
 import type { OrderDoc } from "@/lib/orderApi";
-import logoUrl from "@/assets/royal-oven-logo.png";
 
-/** Theme: matches site primary (teal) + secondary (gold) */
+/** Seller GST identification number (India) */
+export const SELLER_GSTIN = "33ACGFM2172B1ZQ";
+
+/** Theme: teal + gold (original invoice palette) */
 const C = {
   primary: [41, 150, 136] as [number, number, number],
   primaryDark: [26, 96, 87] as [number, number, number],
@@ -17,38 +19,11 @@ function formatMoney(n: number): string {
   return `Rs. ${Number(n).toFixed(2)}`;
 }
 
-async function loadLogoDataUrl(): Promise<string | null> {
-  const toDataUrl = (blob: Blob) =>
-    new Promise<string>((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result as string);
-      fr.onerror = () => reject(new Error("logo read"));
-      fr.readAsDataURL(blob);
-    });
-
-  const tryFetch = async (href: string): Promise<string | null> => {
-    try {
-      const res = await fetch(href);
-      if (!res.ok) return null;
-      return await toDataUrl(await res.blob());
-    } catch {
-      return null;
-    }
-  };
-
-  // Prefer stable public URL so the PDF logo loads even if the bundled asset path fails.
-  if (typeof window !== "undefined") {
-    const fromPublic = await tryFetch(new URL("/royal-oven-logo.png", window.location.href).href);
-    if (fromPublic) return fromPublic;
-  }
-  return tryFetch(logoUrl);
-}
-
 export function orderDisplayId(o: Pick<OrderDoc, "_id" | "orderNumber">): string {
   const n = o.orderNumber != null ? String(o.orderNumber).trim() : "";
   if (n) return n;
   const id = o._id || "";
-  return id ? `RO-${id.slice(-8).toUpperCase()}` : "—";
+  return id ? `MM-${id.slice(-8).toUpperCase()}` : "—";
 }
 
 export function orderStatusLabel(status: string): string {
@@ -66,6 +41,11 @@ export function paymentStatusLabel(ps: string | undefined): string {
   if (v === "paid") return "Successful";
   if (v === "failed") return "Failed";
   return "Pending";
+}
+
+/** Invoice PDF is only allowed after payment has been marked successful. */
+export function canDownloadOrderInvoice(order: Pick<OrderDoc, "paymentStatus">): boolean {
+  return String(order.paymentStatus || "").toLowerCase() === "paid";
 }
 
 function formatAddress(o: OrderDoc): string {
@@ -86,11 +66,13 @@ function paymentMethodLabel(pm: string | undefined): string {
 }
 
 /**
- * Branded PDF — logo in header, Rs. amounts, right-aligned numeric columns.
- * Reflects current order snapshot (refresh list after admin updates payment / fulfillment).
+ * Branded PDF — text header (no logo), Rs. amounts, GSTIN, right-aligned numeric columns.
+ * Only generated when paymentStatus is "paid".
  */
-export async function downloadOrderInvoicePdf(order: OrderDoc): Promise<void> {
-  const logoData = await loadLogoDataUrl();
+export function downloadOrderInvoicePdf(order: OrderDoc): void {
+  if (!canDownloadOrderInvoice(order)) {
+    throw new Error("Invoice is available only after payment is successful.");
+  }
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -116,31 +98,25 @@ export async function downloadOrderInvoicePdf(order: OrderDoc): Promise<void> {
   doc.setFillColor(...C.secondary);
   doc.rect(0, headerH, pageW, 1.2, "F");
 
-  const textStartX = m + (logoData ? 22 : 0);
-
-  if (logoData) {
-    try {
-      doc.addImage(logoData, "PNG", m, 6, 18, 18);
-    } catch {
-      /* ignore bad image */
-    }
-  }
+  const textStartX = m;
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("Royal Oven", textStartX, 13);
+  doc.text("Mixing Memories", textStartX, 11);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Fresh groceries · Quality you can trust", textStartX, 20);
+  doc.text("Curated products · Delivered with care", textStartX, 18);
+  doc.setFontSize(8.5);
+  doc.text(`GSTIN: ${SELLER_GSTIN}`, textStartX, 24);
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("TAX INVOICE", right, 12, { align: "right" });
+  doc.text("TAX INVOICE", right, 11, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
-  doc.text(orderDisplayId(order), right, 19, { align: "right" });
+  doc.text(orderDisplayId(order), right, 20, { align: "right" });
 
   let y = headerH + 10;
 
@@ -154,7 +130,7 @@ export async function downloadOrderInvoicePdf(order: OrderDoc): Promise<void> {
   doc.setTextColor(...C.muted);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.text(`PDF generated: ${new Date().toLocaleString()}`, right, y, { align: "right" });
+  doc.text(`Invoice generated: ${new Date().toLocaleString()}`, right, y, { align: "right" });
 
   y += 8;
   doc.setDrawColor(...C.primary);
@@ -183,7 +159,6 @@ export async function downloadOrderInvoicePdf(order: OrderDoc): Promise<void> {
   doc.text(addrLines, m, y);
   y += Math.max(addrLines.length, 1) * 4 + 4;
 
-  // Stacked lines — a single row was too narrow; "Payment status" overlapped right-aligned values.
   const detailLabelX = m;
   const detailValueX = m + 34;
   const lineGap = 5.2;
@@ -270,20 +245,20 @@ export async function downloadOrderInvoicePdf(order: OrderDoc): Promise<void> {
   doc.setTextColor(...C.primaryDark);
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
-  doc.text("Thank you for shopping with Royal Oven", m + 4, y + 6);
+  doc.text("Thank you for shopping with Mixing Memories", m + 4, y + 6);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...C.ink);
-  doc.text("This document reflects the order and payment status at the time you generated this PDF.", m + 4, y + 11);
+  doc.text("This document reflects the order and payment status at the time you generated this invoice.", m + 4, y + 11);
 
   y = pageH - 14;
   doc.setFontSize(7.5);
   doc.setTextColor(...C.muted);
   const footLines = doc.splitTextToSize(
-    "Royal Oven · theroyaloven.com · For support, use the Contact page on our website.",
+    `Mixing Memories · GSTIN: ${SELLER_GSTIN} · For support, use the Contact page on our website.`,
     innerW,
   );
   doc.text(footLines, m, y);
 
   const safeName = orderDisplayId(order).replace(/[^\w-]+/g, "_");
-  doc.save(`RoyalOven-Invoice-${safeName}.pdf`);
+  doc.save(`MixingMemories-Invoice-${safeName}.pdf`);
 }

@@ -23,6 +23,10 @@ export interface Product {
   /** Same as list/MRP when you need to show both prices explicitly */
   actualPrice?: number;
   image: string;
+  /** Optional short clip from API (`/api/products/:id/video`) */
+  videoUrl?: string;
+  /** False when catalog item is video-only (no cover image in DB) */
+  hasCoverImage?: boolean;
   /** Extra gallery images (e.g. variants) */
   variantImageUrls?: string[];
   badge?: string;

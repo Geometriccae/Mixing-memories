@@ -77,14 +77,26 @@ const ProductViewDialog = ({ open, onOpenChange, product }: Props) => {
                     </div>
                   </div>
                   <div className="shrink-0 w-full lg:w-[220px] space-y-4">
-                    <div>
-                      <p className="text-sm font-bold text-[hsl(222_60%_26%)] mb-2">Product image</p>
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="w-full max-w-[220px] mx-auto lg:mx-0 rounded-lg border border-border object-cover aspect-square"
-                      />
-                    </div>
+                    {product.hasImage ? (
+                      <div>
+                        <p className="text-sm font-bold text-[hsl(222_60%_26%)] mb-2">Product image</p>
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full max-w-[220px] mx-auto lg:mx-0 rounded-lg border border-border object-cover aspect-square"
+                        />
+                      </div>
+                    ) : null}
+                    {product.hasVideo ? (
+                      <div>
+                        <p className="text-sm font-bold text-[hsl(222_60%_26%)] mb-2">Product video</p>
+                        <video
+                          src={product.videoUrl}
+                          controls
+                          className="w-full max-w-[220px] mx-auto lg:mx-0 rounded-lg border border-border bg-black aspect-square object-contain"
+                        />
+                      </div>
+                    ) : null}
                     <div>
                       <p className="text-sm font-bold text-[hsl(222_60%_26%)] mb-2">Variant images</p>
                       <div className="flex flex-wrap gap-2">

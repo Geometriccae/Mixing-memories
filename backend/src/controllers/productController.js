@@ -7,23 +7,22 @@ const ApiError = require("../utils/ApiError");
 const { safeUnlinkWebPath } = require("../utils/saveProductUpload");
 
 /**
- * MongoDB document limit is ~16MB. Because we store images as Buffers inside the Product document,
- * we enforce a TOTAL limit across main + variant images with a small headroom for BSON fields.
+ * MongoDB document limit is ~16MB. Buffers (main image, variants, optional video) share one cap.
  */
-const MAX_TOTAL_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_TOTAL_BINARY_BYTES = 15 * 1024 * 1024;
 
 function bufferForMongo(buffer) {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return null;
   return Buffer.from(buffer);
 }
 
-function ensureTotalImagesUnderLimit(buffers) {
+function ensureTotalBinaryUnderLimit(buffers) {
   const total = (buffers || []).reduce((sum, b) => sum + (b && Buffer.isBuffer(b) ? b.length : 0), 0);
-  if (total > MAX_TOTAL_IMAGE_BYTES) {
+  if (total > MAX_TOTAL_BINARY_BYTES) {
     throw new ApiError(
       413,
-      `Images are too large to store in MongoDB. Please upload smaller images (max total ~${Math.floor(
-        MAX_TOTAL_IMAGE_BYTES / (1024 * 1024),
+      `Media is too large to store in MongoDB. Please use smaller images or a shorter video (max total ~${Math.floor(
+        MAX_TOTAL_BINARY_BYTES / (1024 * 1024),
       )}MB).`,
     );
   }
@@ -62,9 +61,23 @@ function normalizeVariantPathSlots(arr) {
 
 function stripBinaryFields(o) {
   delete o.imageData;
+  delete o.videoData;
   for (let i = 0; i < 3; i += 1) {
     delete o[`variantImageData${i}`];
   }
+}
+
+function legacyHasDiskImage(o) {
+  return !!(o.image && typeof o.image === "string" && o.image.startsWith("/uploads/"));
+}
+
+function resolveHasImage(o, hasVideoFlag) {
+  if (typeof o.hasImage === "boolean") return o.hasImage;
+  return legacyHasDiskImage(o) || !hasVideoFlag;
+}
+
+function resolveHasVideo(o) {
+  return o.hasVideo === true;
 }
 
 function publicProduct(doc, isAdmin = false) {
@@ -79,6 +92,9 @@ function publicProduct(doc, isAdmin = false) {
   delete o.hasVariant1;
   delete o.hasVariant2;
 
+  const hasVideoFlag = resolveHasVideo(o);
+  const hasImageFlag = resolveHasImage(o, hasVideoFlag);
+
   if (!isAdmin) {
     delete o.stock;
     delete o.minStock;
@@ -89,7 +105,10 @@ function publicProduct(doc, isAdmin = false) {
 
   const id = String(o._id);
   const v = o.updatedAt ? new Date(o.updatedAt).getTime() : Date.now();
-  o.imageUrl = `/api/products/${id}/image?v=${v}`;
+  o.imageUrl = hasImageFlag ? `/api/products/${id}/image?v=${v}` : null;
+  o.videoUrl = hasVideoFlag ? `/api/products/${id}/video?v=${v}` : null;
+  o.hasImage = hasImageFlag;
+  o.hasVideo = hasVideoFlag;
 
   const legacyPaths = normalizeVariantPathSlots(o.variantImages);
   o.variantImageUrls = [0, 1, 2].map((i) => {
@@ -115,7 +134,7 @@ function collectVariantFiles(files) {
 }
 
 /** Exclude large Buffers from list/detail JSON; hasVariant* flags preserve variant URL presence */
-const BINARY_EXCLUDE = "-imageData -variantImageData0 -variantImageData1 -variantImageData2";
+const BINARY_EXCLUDE = "-imageData -variantImageData0 -variantImageData1 -variantImageData2 -videoData";
 
 const createProduct = asyncHandler(async (req, res) => {
   const { name, description, specification, price } = req.body;
@@ -126,13 +145,14 @@ const createProduct = asyncHandler(async (req, res) => {
   const files = req.files || {};
   const mainList = files.image;
   const file = Array.isArray(mainList) && mainList[0] ? mainList[0] : null;
-  if (!file || !file.buffer) {
-    throw new ApiError(400, "Product image is required.");
-  }
+  const mainBuf = file && file.buffer ? bufferForMongo(file.buffer) : null;
 
-  const mainBuf = bufferForMongo(file.buffer);
-  if (!mainBuf) {
-    throw new ApiError(400, "Product image is required.");
+  const videoList = files.video;
+  const videoFile = Array.isArray(videoList) && videoList[0] ? videoList[0] : null;
+  const videoBuf = videoFile && videoFile.buffer ? bufferForMongo(videoFile.buffer) : null;
+
+  if (!mainBuf && !videoBuf) {
+    throw new ApiError(400, "Provide at least a product image or a product video.");
   }
 
   const actualPrice = parseOptionalNonNegNumber(req.body.actualPrice);
@@ -149,16 +169,28 @@ const createProduct = asyncHandler(async (req, res) => {
     actualPrice,
     stock,
     minStock,
-    imageData: mainBuf,
-    imageContentType: file.mimetype || "image/jpeg",
     image: "",
+    videoContentType: videoFile ? videoFile.mimetype || "video/mp4" : "video/mp4",
+    hasImage: Boolean(mainBuf),
+    hasVideo: Boolean(videoBuf),
     variantImages: [],
     hasVariant0: false,
     hasVariant1: false,
     hasVariant2: false,
   };
+  if (mainBuf) {
+    doc.imageData = mainBuf;
+    doc.imageContentType = file.mimetype || "image/jpeg";
+  } else {
+    doc.imageContentType = "image/jpeg";
+  }
+  if (videoBuf) {
+    doc.videoData = videoBuf;
+  }
 
-  const allBuffers = [mainBuf];
+  const allBuffers = [];
+  if (mainBuf) allBuffers.push(mainBuf);
+  if (videoBuf) allBuffers.push(videoBuf);
   for (let i = 0; i < 3; i += 1) {
     const vf = variantFiles[i];
     if (vf && vf.buffer) {
@@ -172,7 +204,7 @@ const createProduct = asyncHandler(async (req, res) => {
       allBuffers.push(vb);
     }
   }
-  ensureTotalImagesUnderLimit(allBuffers);
+  ensureTotalBinaryUnderLimit(allBuffers);
 
   const product = await Product.create(doc);
   const full = await Product.findById(product._id).select(BINARY_EXCLUDE);
@@ -232,6 +264,21 @@ const getProductImage = asyncHandler(async (req, res) => {
   }
 
   throw new ApiError(404, "Image not found.");
+});
+
+const getProductVideo = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+  if (!product) throw new ApiError(404, "Product not found.");
+
+  const buf = product.videoData;
+  if (buf && Buffer.isBuffer(buf) && buf.length > 0) {
+    res.set("Content-Type", product.videoContentType || "video/mp4");
+    res.set("Cache-Control", "no-store");
+    res.set("Accept-Ranges", "bytes");
+    return res.send(buf);
+  }
+
+  throw new ApiError(404, "Video not found.");
 });
 
 const getProductVariantImage = asyncHandler(async (req, res) => {
@@ -326,6 +373,12 @@ const updateProduct = asyncHandler(async (req, res) => {
   if (mainFile && mainFile.buffer && !newMainBuf) throw new ApiError(400, "Invalid product image.");
   const removeMain = String(req.body.removeMainImage || "").trim() === "1";
 
+  const videoList = files.video;
+  const videoFile = Array.isArray(videoList) && videoList[0] ? videoList[0] : null;
+  const newVideoBuf = videoFile && videoFile.buffer ? bufferForMongo(videoFile.buffer) : null;
+  if (videoFile && videoFile.buffer && !newVideoBuf) throw new ApiError(400, "Invalid product video.");
+  const removeVideo = String(req.body.removeVideo || "").trim() === "1";
+
   const variantFiles = collectVariantFiles(files);
   let legacySlots = normalizeVariantPathSlots(product.variantImages);
   const newVariantBufs = [];
@@ -369,8 +422,34 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.markModified("imageData");
   }
 
-  ensureTotalImagesUnderLimit([
+  if (removeVideo) {
+    product.set("videoData", undefined);
+    product.videoContentType = "video/mp4";
+    product.markModified("videoData");
+  }
+  if (newVideoBuf) {
+    product.videoData = newVideoBuf;
+    product.videoContentType = videoFile.mimetype || "video/mp4";
+    product.markModified("videoData");
+  }
+
+  const effectiveImage =
+    newMainBuf ||
+    (!removeMain && product.imageData && Buffer.isBuffer(product.imageData) ? product.imageData : null);
+  const effectiveVideo =
+    newVideoBuf ||
+    (!removeVideo && product.videoData && Buffer.isBuffer(product.videoData) ? product.videoData : null);
+
+  product.hasImage = Boolean(effectiveImage) || legacyHasDiskImage(product);
+  product.hasVideo = Boolean(effectiveVideo);
+
+  if (!product.hasImage && !product.hasVideo) {
+    throw new ApiError(400, "Product must keep at least an image or a video.");
+  }
+
+  ensureTotalBinaryUnderLimit([
     product.imageData,
+    product.videoData,
     product.variantImageData0,
     product.variantImageData1,
     product.variantImageData2,
@@ -396,6 +475,7 @@ module.exports = {
   createProduct,
   getProducts,
   getProductImage,
+  getProductVideo,
   getProductVariantImage,
   getProductById,
   postProductsAvailability,

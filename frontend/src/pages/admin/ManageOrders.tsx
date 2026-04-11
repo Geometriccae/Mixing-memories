@@ -3,7 +3,13 @@ import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Eye, FileDown } from "lucide-react";
 import { fetchAdminOrders, patchOrderStatus, type OrderDoc } from "@/lib/orderApi";
-import { downloadOrderInvoicePdf, orderDisplayId, orderStatusLabel, paymentStatusLabel } from "@/lib/orderInvoicePdf";
+import {
+  canDownloadOrderInvoice,
+  downloadOrderInvoicePdf,
+  orderDisplayId,
+  orderStatusLabel,
+  paymentStatusLabel,
+} from "@/lib/orderInvoicePdf";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const STATUS_OPTIONS = ["placed", "shipped", "completed", "cancelled"] as const;
@@ -220,18 +226,17 @@ const ManageOrders = () => {
                   <p className="text-sm text-muted-foreground mt-1">—</p>
                 )}
               </div>
-              {dialogOrder ? (
+              {dialogOrder && canDownloadOrderInvoice(dialogOrder) ? (
                 <button
                   type="button"
                   onClick={() => {
-                    void (async () => {
-                      try {
-                        await downloadOrderInvoicePdf(dialogOrder);
-                        toast.success("Invoice downloaded (current status)");
-                      } catch {
-                        toast.error("Could not generate invoice.");
-                      }
-                    })();
+                    try {
+                      downloadOrderInvoicePdf(dialogOrder);
+                      toast.success("Invoice downloaded");
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Could not generate invoice.";
+                      toast.error(msg);
+                    }
                   }}
                   className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-2 text-sm font-semibold hover:bg-primary/10"
                 >
