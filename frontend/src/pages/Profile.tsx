@@ -33,7 +33,7 @@ const Profile = () => {
   }, [user]);
 
   if (!isLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" replace state={{ from: "/profile" }} />;
   }
 
   if (isLoading || !user) {

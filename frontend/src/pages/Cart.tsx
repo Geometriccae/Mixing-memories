@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
@@ -14,7 +14,8 @@ import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/P
 
 const Cart = () => {
   const location = useLocation();
-  const { user, token, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const { user, token } = useAuth();
   const { items, setQuantity, removeLine, clearCart, subtotal, itemCount } = useCart();
   const [availability, setAvailability] = useState<Record<string, ProductAvailability>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -49,11 +50,7 @@ const Cart = () => {
     return Boolean(a.line1 && a.city && a.state && a.pincode);
   }, [user]);
 
-  if (!isLoading && !user) {
-    return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
-  }
-
-  const placeOrderDisabled = submitting || items.length === 0;
+  const placeOrderDisabled = submitting || items.length === 0 || !user;
 
   const handleOrderSingle = async (productId: string, pm: PaymentMethod) => {
     const line = items.find((l) => l.productId === productId);
@@ -187,10 +184,14 @@ const Cart = () => {
                           <button
                             type="button"
                             onClick={() => {
+                              if (!user) {
+                                toast.error("Please sign in to place an order.");
+                                return;
+                              }
                               setPmForProductId(line.productId);
                               setPmOpen(true);
                             }}
-                            disabled={submitting || orderingOne === line.productId}
+                            disabled={!user || submitting || orderingOne === line.productId}
                             className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
                           >
                             {orderingOne === line.productId ? "Ordering…" : "Order this item"}
@@ -240,60 +241,81 @@ const Cart = () => {
               <h3 className="font-display text-xl font-semibold text-foreground mb-4">Checkout</h3>
 
               <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  {user ? (
-                    <>
-                      Ordering as <span className="font-medium text-foreground">{user.name}</span> ({user.email})
-                    </>
-                  ) : (
-                    "Sign in to place an order."
-                  )}
-                </div>
-
-                {!addressOk ? (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
-                    <p className="font-medium text-destructive">Please fill your delivery address.</p>
-                    <p className="text-muted-foreground mt-1">
-                      Go to{" "}
-                      <Link to="/profile" className="text-primary font-medium hover:underline">
-                        Profile
-                      </Link>{" "}
-                      and save your address, then come back to place the order.
+                {!user ? (
+                  <div className="rounded-lg border border-border bg-muted/30 p-5 text-sm">
+                    <p className="font-semibold text-foreground">Sign in to place your order</p>
+                    <p className="text-muted-foreground mt-2 leading-relaxed">
+                      You can browse products and use your cart without an account. When you are ready to order, log in or create an account.
                     </p>
-                  </div>
-                ) : null}
-
-                <form onSubmit={handlePlaceOrder} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Payment method</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {[
-                        { id: "cod" as const, label: "Cash on delivery" },
-                        { id: "upi" as const, label: "UPI" },
-                        { id: "online" as const, label: "Online payment" },
-                      ].map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setPaymentMethod(m.id)}
-                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
-                            paymentMethod === m.id ? "border-primary bg-primary/5 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted/50"
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap gap-3 mt-4">
+                      <Link
+                        to="/auth"
+                        state={{ from: location.pathname }}
+                        className="inline-flex items-center justify-center rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold hover:opacity-90"
+                      >
+                        Log in
+                      </Link>
+                      <Link
+                        to="/auth?mode=signup"
+                        state={{ from: location.pathname }}
+                        className="inline-flex items-center justify-center rounded-xl border-2 border-primary text-primary px-5 py-2.5 text-sm font-semibold hover:bg-primary/5"
+                      >
+                        Create account
+                      </Link>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-muted-foreground">
+                      Ordering as <span className="font-medium text-foreground">{user.name}</span> ({user.email})
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={placeOrderDisabled}
-                    className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-                  >
-                    {submitting ? "Placing order…" : "Place order"}
-                  </button>
-                </form>
+                    {!addressOk ? (
+                      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+                        <p className="font-medium text-destructive">Please fill your delivery address.</p>
+                        <p className="text-muted-foreground mt-1">
+                          Go to{" "}
+                          <Link to="/profile" className="text-primary font-medium hover:underline">
+                            Profile
+                          </Link>{" "}
+                          and save your address, then come back to place the order.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <form onSubmit={handlePlaceOrder} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-muted-foreground mb-2">Payment method</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {[
+                            { id: "cod" as const, label: "Cash on delivery" },
+                            { id: "upi" as const, label: "UPI" },
+                            { id: "online" as const, label: "Online payment" },
+                          ].map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setPaymentMethod(m.id)}
+                              className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                                paymentMethod === m.id ? "border-primary bg-primary/5 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={placeOrderDisabled}
+                        className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        {submitting ? "Placing order…" : "Place order"}
+                      </button>
+                    </form>
+                  </>
+                )}
               </div>
             </section>
           </div>
@@ -303,6 +325,11 @@ const Cart = () => {
       <PaymentMethodDialog
         open={pmOpen}
         onOpenChange={(o) => {
+          if (o && !user) {
+            toast.error("Please log in to place an order.");
+            navigate("/auth", { state: { from: location.pathname } });
+            return;
+          }
           setPmOpen(o);
           if (!o) setPmForProductId(null);
         }}

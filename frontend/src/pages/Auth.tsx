@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Lock, Mail, User, UserPlus } from "lucide-react";
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
@@ -10,15 +10,39 @@ type Mode = "signin" | "signup";
 const Auth = () => {
   const { user, isLoading, login, register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (searchParams.get("mode") === "signup") {
+      setMode("signup");
+    }
+    const st = location.state as { mode?: string } | null;
+    if (st?.mode === "signup") setMode("signup");
+  }, [searchParams, location.state]);
+
   if (!isLoading && user) {
-    return <Navigate to="/" replace />;
+    const st = location.state as { from?: string } | null;
+    const from = st?.from;
+    const to =
+      typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : "/";
+    return <Navigate to={to} replace />;
   }
+
+  const redirectAfterAuth = () => {
+    const st = location.state as { from?: string } | null;
+    const from = st?.from;
+    if (typeof from === "string" && from.startsWith("/") && !from.startsWith("//")) {
+      navigate(from, { replace: true });
+      return;
+    }
+    navigate("/", { replace: true });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +64,7 @@ const Auth = () => {
         await login(identifier.trim(), password);
         toast.success("Signed in successfully.");
       }
-      navigate("/", { replace: true });
+      redirectAfterAuth();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       toast.error(message);
@@ -59,8 +83,8 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-muted p-4">
-      <Link to="/products" className="mb-8 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        Continue without signing in (browse products)
+      <Link to="/" className="mb-8 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        ← Back to home
       </Link>
       <div className="w-full max-w-md bg-card rounded-2xl card-shadow p-8 border border-border/60">
         <div className="text-center mb-8">

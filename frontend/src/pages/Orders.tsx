@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { FileDown } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
@@ -7,6 +8,7 @@ import SectionHeading from "@/components/common/SectionHeading";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { cancelMyOrder, fetchMyOrders, type OrderDoc } from "@/lib/orderApi";
+import { downloadOrderInvoicePdf, orderDisplayId, paymentStatusLabel } from "@/lib/orderInvoicePdf";
 import { toast } from "sonner";
 
 const Orders = () => {
@@ -84,7 +86,7 @@ const Orders = () => {
   };
 
   if (!isLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" replace state={{ from: "/orders" }} />;
   }
 
   return (
@@ -121,19 +123,49 @@ const Orders = () => {
               <ul className="space-y-4">
                 {myOrders.map((o) => (
                   <li key={o._id} className="rounded-xl border border-border bg-card p-4">
-                    <div className="flex flex-wrap justify-between gap-2 text-sm">
-                      <span className="font-medium text-foreground">
-                        {o.createdAt ? new Date(o.createdAt).toLocaleString() : "—"}
-                      </span>
-                      <span className="text-muted-foreground">
-                        Status: <span className="font-medium text-foreground">{statusLabel(o.status)}</span>
-                      </span>
+                    <div className="flex flex-wrap justify-between gap-2 text-sm items-start">
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Order ID</p>
+                        <p className="font-mono font-semibold text-foreground">{orderDisplayId(o)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {o.createdAt ? new Date(o.createdAt).toLocaleString() : "—"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <span className="text-muted-foreground text-right">
+                          Status: <span className="font-medium text-foreground">{statusLabel(o.status)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await downloadOrderInvoicePdf(o);
+                                toast.success("Invoice downloaded");
+                              } catch {
+                                toast.error("Could not generate invoice.");
+                              }
+                            })();
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/10 transition-colors"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
+                          Download invoice
+                        </button>
+                      </div>
                     </div>
 
-                    <p className="text-sm text-foreground mt-2">₹{Number(o.totalAmount).toFixed(2)} total</p>
+                    <p className="text-sm text-foreground mt-3">₹{Number(o.totalAmount).toFixed(2)} total</p>
                     {o.paymentMethod ? (
                       <p className="text-xs text-muted-foreground mt-1">
-                        Payment: {String(o.paymentMethod).toUpperCase()} {o.paymentStatus ? `• ${String(o.paymentStatus)}` : ""}
+                        Payment: {String(o.paymentMethod).toUpperCase()}
+                        {o.paymentStatus != null ? (
+                          <>
+                            {" "}
+                            •{" "}
+                            <span className="font-medium text-foreground">{paymentStatusLabel(o.paymentStatus)}</span>
+                          </>
+                        ) : null}
                       </p>
                     ) : null}
  

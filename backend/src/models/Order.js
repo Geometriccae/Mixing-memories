@@ -25,6 +25,8 @@ const addressSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+    /** Human-readable id for invoices (e.g. RO-20260410-ABC12X) */
+    orderNumber: { type: String, trim: true, unique: true, sparse: true, index: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
     customerName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },

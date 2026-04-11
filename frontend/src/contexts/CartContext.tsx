@@ -1,5 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Product } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type CartLine = {
   productId: string;
@@ -21,8 +31,76 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+function cartKey(userId: string) {
+  return `royal_oven_cart_v1_${userId}`;
+}
+
+function readCart(userId: string): CartLine[] {
+  try {
+    const raw = localStorage.getItem(cartKey(userId));
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (row): row is CartLine =>
+          row &&
+          typeof row === "object" &&
+          typeof (row as CartLine).productId === "string" &&
+          typeof (row as CartLine).name === "string" &&
+          typeof (row as CartLine).price === "number" &&
+          typeof (row as CartLine).quantity === "number",
+      )
+      .map((row) => ({
+        ...row,
+        image: typeof row.image === "string" ? row.image : "",
+        quantity: Math.max(1, Math.floor(Number(row.quantity))),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function saveCart(userId: string, items: CartLine[]) {
+  try {
+    localStorage.setItem(cartKey(userId), JSON.stringify(items));
+  } catch {
+    /* quota */
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const userId = !isLoading ? (user?.id ?? "guest") : null;
+
   const [items, setItems] = useState<CartLine[]>([]);
+  const prevUserRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isLoading || userId === null) return;
+
+    setItems((current) => {
+      const prev = prevUserRef.current;
+
+      if (prev === null) {
+        prevUserRef.current = userId;
+        return readCart(userId);
+      }
+
+      if (prev !== userId) {
+        saveCart(prev, current);
+        prevUserRef.current = userId;
+        return readCart(userId);
+      }
+
+      return current;
+    });
+  }, [isLoading, userId]);
+
+  useEffect(() => {
+    if (isLoading || userId === null) return;
+    saveCart(userId, items);
+  }, [items, userId, isLoading]);
 
   const addToCart = useCallback((product: Product, qty = 1) => {
     if (product.outOfStock) return;

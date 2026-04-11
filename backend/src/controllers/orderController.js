@@ -6,6 +6,7 @@ const ApiError = require("../utils/ApiError");
 
 const ALLOWED_STATUSES = ["placed", "shipped", "completed", "cancelled"];
 const ALLOWED_PAYMENT_METHODS = ["cod", "upi", "online"];
+const ALLOWED_PAYMENT_STATUS = ["pending", "paid", "failed"];
 
 async function restockOrderItems(items) {
   if (!Array.isArray(items)) return;
@@ -54,6 +55,20 @@ function normalizeShippingAddress(addr) {
 function isAddressFilled(a) {
   if (!a) return false;
   return Boolean(String(a.line1 || "").trim() && String(a.city || "").trim() && String(a.state || "").trim() && String(a.pincode || "").trim());
+}
+
+async function allocateOrderNumber() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const d = new Date();
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const orderNumber = `RO-${y}${mo}${day}-${rand}`;
+    const exists = await Order.findOne({ orderNumber }).select("_id").lean();
+    if (!exists) return orderNumber;
+  }
+  throw new ApiError(500, "Could not allocate order id. Please try again.");
 }
 
 const createOrder = asyncHandler(async (req, res) => {
@@ -105,7 +120,9 @@ const createOrder = asyncHandler(async (req, res) => {
       decremented.push({ id: item.productId, qty: item.quantity });
     }
 
+    const orderNumber = await allocateOrderNumber();
     const order = await Order.create({
+      orderNumber,
       userId: u._id,
       customerName: snapName,
       email: snapEmail,
@@ -129,10 +146,13 @@ const createOrder = asyncHandler(async (req, res) => {
 });
 
 const listOrders = asyncHandler(async (req, res) => {
-  const { status } = req.query;
+  const { status, paymentStatus } = req.query;
   const filter = {};
   if (status && ALLOWED_STATUSES.includes(String(status))) {
     filter.status = String(status);
+  }
+  if (paymentStatus && ALLOWED_PAYMENT_STATUS.includes(String(paymentStatus))) {
+    filter.paymentStatus = String(paymentStatus);
   }
   const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
   res.json({ success: true, data: orders });
@@ -217,6 +237,24 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: out });
 });
 
+const updateOrderPaymentStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { paymentStatus } = req.body || {};
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid order id.");
+  }
+  const next = paymentStatus != null ? String(paymentStatus).toLowerCase() : "";
+  if (!ALLOWED_PAYMENT_STATUS.includes(next)) {
+    throw new ApiError(400, `paymentStatus must be one of: ${ALLOWED_PAYMENT_STATUS.join(", ")}`);
+  }
+  const order = await Order.findById(id);
+  if (!order) throw new ApiError(404, "Order not found.");
+  order.paymentStatus = next;
+  await order.save();
+  const out = await Order.findById(id).lean();
+  res.json({ success: true, data: out });
+});
+
 module.exports = {
   createOrder,
   listOrders,
@@ -224,4 +262,5 @@ module.exports = {
   getMyOrders,
   cancelMyOrder,
   updateOrderStatus,
+  updateOrderPaymentStatus,
 };

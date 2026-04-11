@@ -9,10 +9,10 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 
-const navLinks = [
+const navLinks: { path: string; label: string; authForPath?: string }[] = [
   { path: "/", label: "Home" },
   { path: "/products", label: "Products" },
-  { path: "/orders", label: "My Orders" },
+  { path: "/orders", label: "My Orders", authForPath: "/orders" },
   { path: "/about", label: "About" },
   { path: "/contact", label: "Contact" },
 ];
@@ -24,8 +24,7 @@ const Navbar = () => {
   const { likeCount } = useWishlist();
   const { user, logout } = useAuth();
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const profilePath = user ? "/profile" : "/auth";
-  const profileLabel = user ? user.name.split(/\s+/)[0] ?? "Profile" : "Sign in";
+  const profileLabel = user ? (user.name.split(/\s+/)[0] ?? "Profile") : "";
 
   return (
     <>
@@ -75,17 +74,23 @@ const Navbar = () => {
 
           {/* Desktop links */}
           <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  location.pathname === link.path ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const needsAuth = Boolean(link.authForPath) && !user;
+              const to = needsAuth ? "/auth" : link.path;
+              const state = needsAuth ? { from: link.authForPath } : undefined;
+              return (
+                <Link
+                  key={link.path}
+                  to={to}
+                  state={state}
+                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                    location.pathname === link.path ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Icons */}
@@ -113,7 +118,7 @@ const Navbar = () => {
             {user ? (
               <div className="hidden md:block relative group">
                 <Link
-                  to={profilePath}
+                  to="/profile"
                   className="flex items-center gap-2 rounded-full py-1.5 pl-2 pr-3 hover:bg-muted transition-colors"
                   title="My profile"
                 >
@@ -144,16 +149,20 @@ const Navbar = () => {
                 </div>
               </div>
             ) : (
-              <Link
-                to={profilePath}
-                className="hidden md:flex items-center gap-2 rounded-full py-1.5 pl-2 pr-3 hover:bg-muted transition-colors"
-                title="Sign in"
-              >
-                <span className="p-1.5 rounded-full bg-muted/80">
-                  <User className="h-5 w-5 text-foreground" />
-                </span>
-                <span className="text-sm font-medium text-foreground max-w-[7rem] truncate">{profileLabel}</span>
-              </Link>
+              <div className="hidden md:flex items-center gap-2 shrink-0">
+                <Link
+                  to="/auth"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground px-2 py-2 transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link
+                  to="/auth?mode=signup"
+                  className="text-sm font-semibold rounded-full bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
+                >
+                  Sign up
+                </Link>
+              </div>
             )}
             <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -171,25 +180,50 @@ const Navbar = () => {
               className="md:hidden border-t overflow-hidden bg-background"
             >
               <nav className="container py-4 flex flex-col gap-3">
-                {navLinks.map((link) => (
+                {navLinks.map((link) => {
+                  const needsAuth = Boolean(link.authForPath) && !user;
+                  const to = needsAuth ? "/auth" : link.path;
+                  const state = needsAuth ? { from: link.authForPath } : undefined;
+                  return (
+                    <Link
+                      key={link.path}
+                      to={to}
+                      state={state}
+                      onClick={() => setMobileOpen(false)}
+                      className={`text-sm font-medium py-2 ${
+                        location.pathname === link.path ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+                {user ? (
                   <Link
-                    key={link.path}
-                    to={link.path}
+                    to="/profile"
                     onClick={() => setMobileOpen(false)}
-                    className={`text-sm font-medium py-2 ${
-                      location.pathname === link.path ? "text-primary" : "text-muted-foreground"
-                    }`}
+                    className="text-sm font-medium py-2 text-muted-foreground"
                   >
-                    {link.label}
+                    My profile
                   </Link>
-                ))}
-                <Link
-                  to={profilePath}
-                  onClick={() => setMobileOpen(false)}
-                  className="text-sm font-medium py-2 text-muted-foreground"
-                >
-                  {user ? "My profile" : "Sign in"}
-                </Link>
+                ) : (
+                  <>
+                    <Link
+                      to="/auth"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm font-medium py-2 text-primary"
+                    >
+                      Log in
+                    </Link>
+                    <Link
+                      to="/auth?mode=signup"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm font-medium py-2 text-muted-foreground"
+                    >
+                      Create account
+                    </Link>
+                  </>
+                )}
                 <Link
                   to="/likes"
                   onClick={() => setMobileOpen(false)}
