@@ -5,7 +5,8 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
-    host: "::",
+    /** Same Wi‑Fi phone testing: open http://YOUR_PC_IP:8080 and point VITE_API_BASE_URL at http://YOUR_PC_IP:5000 */
+    host: true,
     port: 8080,
     hmr: {
       overlay: false,

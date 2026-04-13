@@ -6,21 +6,35 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
 import SectionHeading from "@/components/common/SectionHeading";
-import { useCart } from "@/contexts/CartContext";
+import { useCart, type CartLine } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchProductsAvailability, type ProductAvailability } from "@/lib/catalogApi";
-import { createOrder } from "@/lib/orderApi";
+import { loadRazorpayScript } from "@/lib/razorpayCheckout";
+import { abandonUnpaidOrder, createOrder, type OrderDoc } from "@/lib/orderApi";
+import { payOrderWithRazorpay } from "@/lib/payOrderWithRazorpay";
 import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/PaymentMethodDialog";
+
+function orderItemsToCartLines(o: OrderDoc): CartLine[] {
+  return o.items
+    .filter((it) => it.productId)
+    .map((it) => ({
+      productId: String(it.productId),
+      name: it.name,
+      price: Number(it.price),
+      quantity: Math.max(1, Math.floor(Number(it.quantity))),
+      image: typeof it.image === "string" ? it.image : "",
+    }));
+}
 
 const Cart = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, token } = useAuth();
-  const { items, setQuantity, removeLine, clearCart, subtotal, itemCount } = useCart();
+  const { items, setQuantity, removeLine, clearCart, replaceCart, mergeLine, subtotal, itemCount } = useCart();
   const [availability, setAvailability] = useState<Record<string, ProductAvailability>>({});
   const [submitting, setSubmitting] = useState(false);
   const [orderingOne, setOrderingOne] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [pmOpen, setPmOpen] = useState(false);
   const [pmForProductId, setPmForProductId] = useState<string | null>(null);
 
@@ -44,6 +58,12 @@ const Cart = () => {
     };
   }, [items]);
 
+  useEffect(() => {
+    if (token && items.length > 0) {
+      void loadRazorpayScript().catch(() => {});
+    }
+  }, [token, items.length]);
+
   const addressOk = useMemo(() => {
     if (!user) return false;
     const a = user.address;
@@ -65,7 +85,8 @@ const Cart = () => {
     }
     setOrderingOne(productId);
     try {
-      const avail = await fetchProductsAvailability([productId]);
+      const avail =
+        availability[productId] != null ? availability : await fetchProductsAvailability([productId]);
       const a = avail[productId];
       const max = a ? Number(a.maxOrderable) : 0;
       if (!Number.isFinite(max) || max < 1) {
@@ -75,7 +96,7 @@ const Cart = () => {
         throw new Error(`Not enough stock for "${line.name}". Only ${max} available.`);
       }
 
-      await createOrder(token, {
+      const order = await createOrder(token, {
         items: [
           {
             productId: line.productId,
@@ -87,12 +108,40 @@ const Cart = () => {
         ],
         paymentMethod: pm,
       });
-
+      if (!user) return;
       removeLine(productId);
-      toast.success("Order placed successfully!");
+      try {
+        await payOrderWithRazorpay(token, order, pm, {
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        });
+        toast.success("Order placed and paid successfully!");
+      } catch (payErr: unknown) {
+        const pmsg = payErr instanceof Error ? payErr.message : String(payErr);
+        if (pmsg === "Payment was cancelled.") {
+          try {
+            await abandonUnpaidOrder(token, order._id);
+            const lines = orderItemsToCartLines(order);
+            const line = lines[0];
+            if (line) mergeLine(line);
+            toast.info("Checkout cancelled. Your item is back in the cart.");
+          } catch (cancelErr: unknown) {
+            const cmsg = cancelErr instanceof Error ? cancelErr.message : String(cancelErr);
+            toast.error(cmsg || "Could not cancel checkout.");
+          }
+        } else {
+          toast.warning("Order saved — payment did not go through. Use Pay now on My Orders → Pending to try again.");
+          navigate("/orders/pending");
+        }
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(msg || "Failed to place order.");
+      if (msg === "Payment was cancelled.") {
+        toast.error("Payment cancelled.");
+      } else {
+        toast.error(msg || "Failed to place order.");
+      }
     } finally {
       setOrderingOne(null);
     }
@@ -115,7 +164,8 @@ const Cart = () => {
     setSubmitting(true);
     try {
       const ids = items.map((l) => l.productId).filter(Boolean);
-      const avail = await fetchProductsAvailability(ids);
+      const haveAll = ids.length > 0 && ids.every((id) => availability[id] != null);
+      const avail = haveAll ? availability : await fetchProductsAvailability(ids);
       for (const line of items) {
         const a = avail[line.productId];
         const max = a ? Number(a.maxOrderable) : 0;
@@ -127,7 +177,7 @@ const Cart = () => {
         }
       }
 
-      await createOrder(token, {
+      const order = await createOrder(token, {
         items: items.map((l) => ({
           productId: l.productId,
           name: l.name,
@@ -137,12 +187,37 @@ const Cart = () => {
         })),
         paymentMethod,
       });
-
       clearCart();
-      toast.success("Order placed successfully!");
+      try {
+        await payOrderWithRazorpay(token, order, paymentMethod, {
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        });
+        toast.success("Order placed and paid successfully!");
+      } catch (payErr: unknown) {
+        const pmsg = payErr instanceof Error ? payErr.message : String(payErr);
+        if (pmsg === "Payment was cancelled.") {
+          try {
+            await abandonUnpaidOrder(token, order._id);
+            replaceCart(orderItemsToCartLines(order));
+            toast.info("Checkout cancelled. Your cart was restored.");
+          } catch (cancelErr: unknown) {
+            const cmsg = cancelErr instanceof Error ? cancelErr.message : String(cancelErr);
+            toast.error(cmsg || "Could not cancel checkout.");
+          }
+        } else {
+          toast.warning("Order saved — payment did not go through. Use Pay now on My Orders → Pending to try again.");
+          navigate("/orders/pending");
+        }
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(msg || "Failed to place order.");
+      if (msg === "Payment was cancelled.") {
+        toast.error("Payment cancelled.");
+      } else {
+        toast.error(msg || "Failed to place order.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -286,21 +361,26 @@ const Cart = () => {
                     <form onSubmit={handlePlaceOrder} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-2">Payment method</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 gap-2">
                           {[
-                            { id: "cod" as const, label: "Cash on delivery" },
-                            { id: "upi" as const, label: "UPI" },
-                            { id: "online" as const, label: "Online payment" },
+                            {
+                              id: "upi" as const,
+                              label: "UPI",
+                              hint: "Phone browser: GPay/PhonePe · PC: QR or UPI ID (test QR often invalid in real apps — use success@razorpay or pay on phone)",
+                            },
+                            { id: "netbanking" as const, label: "Net banking", hint: "Bank transfer" },
+                            { id: "card" as const, label: "Card", hint: "Debit / credit" },
                           ].map((m) => (
                             <button
                               key={m.id}
                               type="button"
                               onClick={() => setPaymentMethod(m.id)}
-                              className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                              className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                                 paymentMethod === m.id ? "border-primary bg-primary/5 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted/50"
                               }`}
                             >
-                              {m.label}
+                              <span className="block text-sm font-medium text-foreground">{m.label}</span>
+                              <span className="block text-xs text-muted-foreground mt-0.5">{m.hint}</span>
                             </button>
                           ))}
                         </div>

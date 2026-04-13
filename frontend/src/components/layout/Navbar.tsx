@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, LogOut, Search, ShoppingCart, Heart, User, Menu, X } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import { lookupProductByBarcode } from "@/lib/catalogApi";
 
 const navLinks: { path: string; label: string; authForPath?: string }[] = [
   { path: "/", label: "Home" },
@@ -19,7 +20,9 @@ const navLinks: { path: string; label: string; authForPath?: string }[] = [
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState("");
   const location = useLocation();
+  const navigate = useNavigate();
   const { itemCount } = useCart();
   const { likeCount } = useWishlist();
   const { user, logout } = useAuth();
@@ -28,7 +31,7 @@ const Navbar = () => {
 
   return (
     <>
-      {/* Top bar */}
+      {/* Top bar (primary green strip) — hidden
       <div className="bg-primary text-primary-foreground text-sm py-2">
         <div className="container flex flex-wrap justify-end items-center gap-2">
           <div className="flex gap-4 items-center">
@@ -37,6 +40,7 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+      */}
 
       {/* Main nav */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
@@ -62,28 +66,55 @@ const Navbar = () => {
           </Link>
 
           {/* Search bar - desktop */}
-          <div className="hidden lg:flex items-center bg-muted rounded-full px-4 py-2 flex-1 max-w-md mx-8">
-            <Search className="h-4 w-4 text-muted-foreground mr-2" />
+          <form
+            className="hidden lg:flex items-center bg-muted rounded-full px-4 py-2 flex-1 max-w-md mx-8"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = headerSearch.trim();
+              if (!q) return;
+              void (async () => {
+                try {
+                  const id = await lookupProductByBarcode(q);
+                  if (id) {
+                    setHeaderSearch("");
+                    navigate(`/products/${id}`);
+                    return;
+                  }
+                } catch {
+                  /* toast below */
+                }
+                toast.error("No product for this barcode. Try another code or browse Products.");
+              })();
+            }}
+          >
+            <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" aria-hidden />
             <input
               type="text"
-              placeholder="Search products..."
-              className="bg-transparent outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground"
+              value={headerSearch}
+              onChange={(e) => setHeaderSearch(e.target.value)}
+              placeholder="Product barcode…"
+              autoComplete="off"
+              className="bg-transparent outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground min-w-0"
             />
-          </div>
+          </form>
 
           {/* Desktop links */}
           <nav className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => {
               const needsAuth = Boolean(link.authForPath) && !user;
-              const to = needsAuth ? "/auth" : link.path;
+              const to = needsAuth ? "/auth" : link.path === "/orders" ? "/orders/pending" : link.path;
               const state = needsAuth ? { from: link.authForPath } : undefined;
+              const active =
+                link.path === "/orders"
+                  ? location.pathname.startsWith("/orders")
+                  : location.pathname === link.path;
               return (
                 <Link
                   key={link.path}
                   to={to}
                   state={state}
                   className={`text-sm font-medium transition-colors hover:text-primary ${
-                    location.pathname === link.path ? "text-primary" : "text-muted-foreground"
+                    active ? "text-primary" : "text-muted-foreground"
                   }`}
                 >
                   {link.label}
@@ -181,17 +212,19 @@ const Navbar = () => {
               <nav className="container py-4 flex flex-col gap-3">
                 {navLinks.map((link) => {
                   const needsAuth = Boolean(link.authForPath) && !user;
-                  const to = needsAuth ? "/auth" : link.path;
+                  const to = needsAuth ? "/auth" : link.path === "/orders" ? "/orders/pending" : link.path;
                   const state = needsAuth ? { from: link.authForPath } : undefined;
+                  const active =
+                    link.path === "/orders"
+                      ? location.pathname.startsWith("/orders")
+                      : location.pathname === link.path;
                   return (
                     <Link
                       key={link.path}
                       to={to}
                       state={state}
                       onClick={() => setMobileOpen(false)}
-                      className={`text-sm font-medium py-2 ${
-                        location.pathname === link.path ? "text-primary" : "text-muted-foreground"
-                      }`}
+                      className={`text-sm font-medium py-2 ${active ? "text-primary" : "text-muted-foreground"}`}
                     >
                       {link.label}
                     </Link>
@@ -233,6 +266,49 @@ const Navbar = () => {
                 <Link to="/admin" onClick={() => setMobileOpen(false)} className="text-sm font-medium py-2 text-muted-foreground">
                   Admin Panel
                 </Link>
+                <form
+                  className="pt-2 border-t border-border mt-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const q = headerSearch.trim();
+                    if (!q) return;
+                    void (async () => {
+                      try {
+                        const id = await lookupProductByBarcode(q);
+                        if (id) {
+                          setHeaderSearch("");
+                          setMobileOpen(false);
+                          navigate(`/products/${id}`);
+                          return;
+                        }
+                      } catch {
+                        /* */
+                      }
+                      toast.error("No product for this barcode.");
+                    })();
+                  }}
+                >
+                  <label htmlFor="mobile-barcode-search" className="sr-only">
+                    Barcode lookup
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="mobile-barcode-search"
+                      type="text"
+                      value={headerSearch}
+                      onChange={(e) => setHeaderSearch(e.target.value)}
+                      placeholder="Barcode…"
+                      autoComplete="off"
+                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-primary text-primary-foreground px-3 py-2 text-sm font-medium shrink-0"
+                    >
+                      Go
+                    </button>
+                  </div>
+                </form>
               </nav>
             </motion.div>
           )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpDown, Eye, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, Barcode, Eye, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import SimpleProductCreateDialog from "@/pages/admin/productDialogs/SimpleProductCreateDialog";
@@ -11,7 +11,19 @@ const navy = "bg-[hsl(222_47%_16%)]";
 const thClass = `${navy} text-white text-left text-xs font-semibold uppercase tracking-wide px-4 py-3 border-b border-white/10`;
 const sortIcon = <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-70" />;
 
-function ActionButtons({ onView, onEdit, onDelete }: { onView: () => void; onEdit: () => void; onDelete: () => void }) {
+function ActionButtons({
+  onView,
+  onEdit,
+  onDelete,
+  onDownloadBarcode,
+  showBarcodeDownload,
+}: {
+  onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDownloadBarcode: () => void;
+  showBarcodeDownload: boolean;
+}) {
   return (
     <div className="flex items-center justify-center gap-1.5 flex-wrap">
       <button
@@ -30,6 +42,17 @@ function ActionButtons({ onView, onEdit, onDelete }: { onView: () => void; onEdi
       >
         <Pencil className="h-4 w-4" />
       </button>
+      {showBarcodeDownload ? (
+        <button
+          type="button"
+          onClick={onDownloadBarcode}
+          className="h-8 w-8 rounded-md bg-emerald-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+          aria-label="Download barcode"
+          title="Download barcode"
+        >
+          <Barcode className="h-4 w-4" />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onDelete}
@@ -57,6 +80,7 @@ type ApiProduct = {
   hasVideo?: boolean;
   updatedAt?: string;
   variantImageUrls?: (string | null)[];
+  barcode?: string;
 };
 
 const ManageProducts = () => {
@@ -94,6 +118,30 @@ const ManageProducts = () => {
       ...init,
       headers,
     });
+  };
+
+  const downloadProductBarcode = async (r: AdminProductRow) => {
+    if (!r.barcode) return;
+    try {
+      const res = await authedFetch(`/api/products/${r.id}/barcode`, {}, true);
+      if (!res.ok) {
+        const j: unknown = await res.json().catch(() => ({}));
+        const msg =
+          j && typeof j === "object" && "message" in j ? String((j as { message?: unknown }).message) : "Download failed.";
+        toast.error(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `barcode-${r.barcode.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "") || r.id}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Barcode downloaded");
+    } catch {
+      toast.error("Could not download barcode.");
+    }
   };
 
   const toBlob = async (src: string): Promise<Blob> => {
@@ -163,6 +211,7 @@ const ManageProducts = () => {
         hasImage: Boolean(hasImageFlag && imageUrl),
         hasVideo: Boolean(hasVideoFlag && videoUrl),
         variantImageUrls,
+        barcode: typeof p.barcode === "string" && p.barcode.trim() ? p.barcode.trim() : undefined,
       };
     },
     [apiBaseUrl],
@@ -422,6 +471,8 @@ const ManageProducts = () => {
                               setEditProductOpen(true);
                             }}
                             onDelete={() => setDeleteTarget(r)}
+                            showBarcodeDownload={Boolean(r.barcode)}
+                            onDownloadBarcode={() => void downloadProductBarcode(r)}
                           />
                         </td>
                       </tr>
@@ -497,7 +548,8 @@ const ManageProducts = () => {
               if (!res.ok) throw new Error((json as { message?: string })?.message || "Failed to delete product.");
               toast.success("Product removed");
               setDeleteTarget(null);
-              await refreshProducts();
+              setProducts((prev) => prev.filter((p) => p.id !== id));
+              void refreshProducts();
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
               toast.error(message || "Failed to delete product.");

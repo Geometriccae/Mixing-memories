@@ -25,6 +25,10 @@ type CartContextValue = {
   setQuantity: (productId: string, quantity: number) => void;
   removeLine: (productId: string) => void;
   clearCart: () => void;
+  /** Replace cart (e.g. restore after abandoning checkout). */
+  replaceCart: (lines: CartLine[]) => void;
+  /** Add quantities back for one line (e.g. single-item checkout cancelled). */
+  mergeLine: (line: CartLine) => void;
   itemCount: number;
   subtotal: number;
 };
@@ -140,6 +144,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  const replaceCart = useCallback((lines: CartLine[]) => {
+    setItems(
+      lines
+        .filter((l) => l.productId)
+        .map((l) => ({
+          ...l,
+          quantity: Math.max(1, Math.floor(Number(l.quantity))),
+        })),
+    );
+  }, []);
+
+  const mergeLine = useCallback((line: CartLine) => {
+    if (!line.productId) return;
+    const q = Math.max(1, Math.floor(Number(line.quantity)));
+    setItems((prev) => {
+      const i = prev.findIndex((l) => l.productId === line.productId);
+      if (i === -1) return [...prev, { ...line, quantity: q }];
+      const next = [...prev];
+      next[i] = { ...next[i], quantity: next[i].quantity + q };
+      return next;
+    });
+  }, []);
+
   const itemCount = useMemo(() => items.reduce((s, l) => s + l.quantity, 0), [items]);
   const subtotal = useMemo(() => items.reduce((s, l) => s + l.price * l.quantity, 0), [items]);
 
@@ -150,10 +177,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setQuantity,
       removeLine,
       clearCart,
+      replaceCart,
+      mergeLine,
       itemCount,
       subtotal,
     }),
-    [items, addToCart, setQuantity, removeLine, clearCart, itemCount, subtotal],
+    [items, addToCart, setQuantity, removeLine, clearCart, replaceCart, mergeLine, itemCount, subtotal],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

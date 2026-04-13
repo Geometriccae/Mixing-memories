@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { FileDown } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -8,15 +8,29 @@ import SectionHeading from "@/components/common/SectionHeading";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { cancelMyOrder, fetchMyOrders, type OrderDoc } from "@/lib/orderApi";
+import { payOrderWithRazorpay } from "@/lib/payOrderWithRazorpay";
+import { loadRazorpayScript } from "@/lib/razorpayCheckout";
+import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/PaymentMethodDialog";
 import { canDownloadOrderInvoice, downloadOrderInvoicePdf, orderDisplayId, paymentStatusLabel } from "@/lib/orderInvoicePdf";
 import { toast } from "sonner";
 
+function orderPaymentMethod(o: OrderDoc): PaymentMethod {
+  const m = String(o.paymentMethod || "").toLowerCase();
+  if (m === "card" || m === "netbanking" || m === "upi") return m;
+  return "upi";
+}
+
 const Orders = () => {
+  const { pathname } = useLocation();
   const { user, token, isLoading } = useAuth();
   const [myOrders, setMyOrders] = useState<OrderDoc[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payDialogOrder, setPayDialogOrder] = useState<OrderDoc | null>(null);
+  const [payDialogMethod, setPayDialogMethod] = useState<PaymentMethod>("upi");
 
   const statusLabel = useMemo(
     () => (s: string) => {
@@ -67,6 +81,58 @@ const Orders = () => {
     void loadMyOrders();
   }, [token]);
 
+  const paymentView: "paid" | "unpaid" = pathname.includes("/success") ? "paid" : "unpaid";
+
+  const filteredOrders = useMemo(() => {
+    return myOrders.filter((o) => {
+      const ps = String(o.paymentStatus || "").toLowerCase();
+      if (paymentView === "paid") return ps === "paid";
+      return ps !== "paid";
+    });
+  }, [myOrders, paymentView]);
+
+  const openPayDialog = (o: OrderDoc) => {
+    if (!token || !user) return;
+    setPayDialogOrder(o);
+    setPayDialogMethod(orderPaymentMethod(o));
+    setPayDialogOpen(true);
+  };
+
+  const runPayOrder = (o: OrderDoc, pm: PaymentMethod) => {
+    if (!token || !user) return;
+    void (async () => {
+      setPayingOrderId(o._id);
+      try {
+        await loadRazorpayScript();
+        await payOrderWithRazorpay(token, o, pm, {
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        });
+        toast.success("Payment successful!");
+        await loadMyOrders();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === "Payment was cancelled.") {
+          toast.error("Payment cancelled.");
+        } else {
+          toast.error(msg || "Payment failed.");
+        }
+      } finally {
+        setPayingOrderId(null);
+        setPayDialogOrder(null);
+      }
+    })();
+  };
+
+  const confirmPayDialog = () => {
+    if (!payDialogOrder || payingOrderId) return;
+    const o = payDialogOrder;
+    const pm = payDialogMethod;
+    setPayDialogOpen(false);
+    runPayOrder(o, pm);
+  };
+
   const confirmCancelOrder = () => {
     if (!token || !cancelOrderId) return;
     void (async () => {
@@ -86,7 +152,7 @@ const Orders = () => {
   };
 
   if (!isLoading && !user) {
-    return <Navigate to="/auth" replace state={{ from: "/orders" }} />;
+    return <Navigate to="/auth" replace state={{ from: pathname || "/orders/pending" }} />;
   }
 
   return (
@@ -94,20 +160,47 @@ const Orders = () => {
       <Navbar />
       <main className="min-h-screen">
         <SectionWrapper>
-          <SectionHeading title="My Orders" subtitle="Track your orders and delivery status" />
+          <SectionHeading
+            title="My Orders"
+            subtitle={
+              paymentView === "paid"
+                ? "Orders with successful payment — download invoices here."
+                : "Orders that still need payment — your order is saved; complete Razorpay checkout with Pay now."
+            }
+          />
 
           <div className="max-w-3xl mx-auto space-y-6">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <p className="text-sm text-muted-foreground">
                 Signed in as <span className="font-medium text-foreground">{user?.name}</span>
               </p>
-              <button
-                type="button"
-                onClick={() => void loadMyOrders()}
-                className="px-4 py-2 rounded-xl bg-muted text-foreground font-medium border border-border hover:bg-muted/80"
-              >
-                Refresh
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex rounded-xl border border-border bg-card p-1">
+                  <Link
+                    to="/orders/success"
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      paymentView === "paid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Successful
+                  </Link>
+                  <Link
+                    to="/orders/pending"
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      paymentView === "unpaid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Pending
+                  </Link>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadMyOrders()}
+                  className="px-4 py-2 rounded-xl bg-muted text-foreground font-medium border border-border hover:bg-muted/80"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
 
             {loadingOrders ? (
@@ -119,9 +212,36 @@ const Orders = () => {
                   Go to your <Link to="/cart" className="text-primary font-medium hover:underline">cart</Link> to place an order.
                 </p>
               </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <p className="text-foreground font-medium">
+                  {paymentView === "paid" ? "No successful payments yet" : "No pending payments"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {paymentView === "paid" ? (
+                    <>
+                      Paid orders will appear here after Razorpay confirms payment.{" "}
+                      <Link to="/orders/pending" className="text-primary font-medium hover:underline">
+                        View pending
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link to="/orders/success" className="text-primary font-medium hover:underline">
+                        View successful orders
+                      </Link>{" "}
+                      or place a new order from your{" "}
+                      <Link to="/cart" className="text-primary font-medium hover:underline">
+                        cart
+                      </Link>
+                      .
+                    </>
+                  )}
+                </p>
+              </div>
             ) : (
               <ul className="space-y-4">
-                {myOrders.map((o) => (
+                {filteredOrders.map((o) => (
                   <li key={o._id} className="rounded-xl border border-border bg-card p-4">
                     <div className="flex flex-wrap justify-between gap-2 text-sm items-start">
                       <div className="space-y-1">
@@ -157,6 +277,24 @@ const Orders = () => {
                     </div>
 
                     <p className="text-sm text-foreground mt-3">₹{Number(o.totalAmount).toFixed(2)} total</p>
+
+                    {paymentView === "unpaid" &&
+                    String(o.status).toLowerCase() === "placed" &&
+                    String(o.paymentStatus || "").toLowerCase() === "pending" ? (
+                      <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground leading-relaxed">
+                        <span className="font-medium">Order placed successfully.</span> Payment is still pending — use{" "}
+                        <span className="font-medium">Pay now</span> when you are ready.
+                      </div>
+                    ) : null}
+                    {paymentView === "unpaid" &&
+                    String(o.status).toLowerCase() === "placed" &&
+                    String(o.paymentStatus || "").toLowerCase() === "failed" ? (
+                      <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-foreground leading-relaxed">
+                        <span className="font-medium">Order placed successfully,</span> but the last payment attempt did not
+                        complete. Use <span className="font-medium">Pay now</span> to try again.
+                      </div>
+                    ) : null}
+
                     {o.paymentMethod ? (
                       <p className="text-xs text-muted-foreground mt-1">
                         Payment: {String(o.paymentMethod).toUpperCase()}
@@ -237,7 +375,17 @@ const Orders = () => {
                     )}
 
                     {String(o.status).toLowerCase() === "placed" ? (
-                      <div className="mt-3">
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        {String(o.paymentStatus || "").toLowerCase() !== "paid" ? (
+                          <button
+                            type="button"
+                            disabled={payingOrderId === o._id}
+                            onClick={() => openPayDialog(o)}
+                            className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                          >
+                            {payingOrderId === o._id ? "Opening payment…" : "Pay now"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => setCancelOrderId(o._id)}
@@ -245,7 +393,7 @@ const Orders = () => {
                         >
                           Cancel order
                         </button>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground w-full">
                           You can cancel before the order ships. Stock will be returned to the store.
                         </p>
                       </div>
@@ -298,6 +446,20 @@ const Orders = () => {
         </SectionWrapper>
       </main>
       <Footer />
+
+      <PaymentMethodDialog
+        open={payDialogOpen}
+        onOpenChange={(open) => {
+          setPayDialogOpen(open);
+          if (!open) setPayDialogOrder(null);
+        }}
+        value={payDialogMethod}
+        onChange={setPayDialogMethod}
+        title="How do you want to pay?"
+        confirmLabel="Continue to Razorpay"
+        confirming={false}
+        onConfirm={confirmPayDialog}
+      />
 
       <ConfirmDialog
         open={Boolean(cancelOrderId)}

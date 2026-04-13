@@ -19,7 +19,7 @@ export type ShippingAddressPayload = {
 
 export type CreateOrderPayload = {
   items: OrderItemPayload[];
-  paymentMethod: "cod" | "upi" | "online";
+  paymentMethod: "upi" | "netbanking" | "card";
   /** Optional: if omitted, backend uses profile address */
   shippingAddress?: Partial<ShippingAddressPayload>;
 };
@@ -41,7 +41,7 @@ export type OrderDoc = {
   email: string;
   phone?: string;
   shippingAddress?: ShippingAddressPayload;
-  paymentMethod?: "cod" | "upi" | "online" | string;
+  paymentMethod?: "cod" | "upi" | "online" | "netbanking" | "card" | string;
   paymentStatus?: "pending" | "paid" | "failed" | string;
   items: OrderItemDoc[];
   totalAmount: number;
@@ -102,6 +102,9 @@ export async function fetchMyOrders(token: string): Promise<OrderDoc[]> {
 export type AdminOrderFilters = {
   orderStatus?: string | null;
   paymentStatus?: string | null;
+  /** Inclusive `YYYY-MM-DD`, server filters by `createdAt` */
+  from?: string | null;
+  to?: string | null;
 };
 
 export async function fetchAdminOrders(
@@ -111,14 +114,20 @@ export async function fetchAdminOrders(
   const base = `${apiBaseUrl()}/api/orders`;
   let orderStatus: string | undefined;
   let paymentStatus: string | undefined;
+  let from: string | undefined;
+  let to: string | undefined;
   if (typeof filters === "string") orderStatus = filters;
   else if (filters && typeof filters === "object") {
     orderStatus = filters.orderStatus ?? undefined;
     paymentStatus = filters.paymentStatus ?? undefined;
+    from = filters.from?.trim() || undefined;
+    to = filters.to?.trim() || undefined;
   }
   const params = new URLSearchParams();
   if (orderStatus) params.set("status", orderStatus);
   if (paymentStatus) params.set("paymentStatus", paymentStatus);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
   const q = params.toString();
   const url = q ? `${base}?${q}` : base;
   const res = await fetch(url, {
@@ -174,6 +183,54 @@ export async function patchOrderStatus(
   }
 }
 
+export type RazorpayCheckoutBundle = {
+  keyId: string;
+  amount: number;
+  currency: string;
+  razorpayOrderId: string;
+  orderNumber?: string;
+};
+
+export async function createRazorpayOrderForCheckout(token: string, orderId: string): Promise<RazorpayCheckoutBundle> {
+  const res = await fetch(`${apiBaseUrl()}/api/payments/razorpay/order`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ orderId }),
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Could not start payment.");
+  }
+  const data = parseData<RazorpayCheckoutBundle>(json);
+  if (!data?.keyId || !data.razorpayOrderId || typeof data.amount !== "number") {
+    throw new Error("Invalid payment session.");
+  }
+  return data;
+}
+
+export async function verifyRazorpayPayment(
+  token: string,
+  orderId: string,
+  razorpay_order_id: string,
+  razorpay_payment_id: string,
+  razorpay_signature: string,
+): Promise<OrderDoc> {
+  const res = await fetch(`${apiBaseUrl()}/api/payments/razorpay/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }),
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Payment verification failed.");
+  }
+  const data = parseData<OrderDoc>(json);
+  if (!data || !data._id) throw new Error("Invalid verify response.");
+  return data;
+}
+
 export async function cancelMyOrder(token: string, orderId: string): Promise<OrderDoc> {
   const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/cancel`, {
     method: "PATCH",
@@ -187,4 +244,17 @@ export async function cancelMyOrder(token: string, orderId: string): Promise<Ord
   const data = parseData<OrderDoc>(json);
   if (!data || !data._id) throw new Error("Invalid cancel response.");
   return data;
+}
+
+/** Deletes an unpaid placed order and restocks (e.g. user closed Razorpay during cart checkout). */
+export async function abandonUnpaidOrder(token: string, orderId: string): Promise<void> {
+  const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/abandon`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Could not remove unpaid order.");
+  }
 }

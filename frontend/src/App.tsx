@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +21,7 @@ const Cart = lazy(() => import("./pages/Cart"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminOrdersOverview = lazy(() => import("./pages/admin/AdminOrdersOverview"));
 const ManageProducts = lazy(() => import("./pages/admin/ManageProducts"));
 const ManageTestimonials = lazy(() => import("./pages/admin/ManageTestimonials"));
 const ManageUsers = lazy(() => import("./pages/admin/ManageUsers"));
@@ -39,14 +41,15 @@ const Loading = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-        <CartProvider>
-        <WishlistProvider>
-        <Suspense fallback={<Loading />}>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="royal-oven-theme">
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+          <CartProvider>
+          <WishlistProvider>
+          <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
@@ -55,7 +58,9 @@ const App = () => (
             <Route path="/likes" element={<Likes />} />
             <Route path="/products/:productId" element={<ProductDetail />} />
             <Route path="/cart" element={<Cart />} />
-            <Route path="/orders" element={<Orders />} />
+            <Route path="/orders" element={<Navigate to="/orders/pending" replace />} />
+            <Route path="/orders/success" element={<Orders />} />
+            <Route path="/orders/pending" element={<Orders />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/admin" element={<AdminLogin />} />
@@ -63,6 +68,7 @@ const App = () => (
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/products" element={<ManageProducts />} />
               <Route path="/admin/orders" element={<ManageOrders />} />
+              <Route path="/admin/orders/overview" element={<AdminOrdersOverview />} />
               <Route path="/admin/orders/placed" element={<ManageOrders />} />
               <Route path="/admin/orders/shipped" element={<ManageOrders />} />
               <Route path="/admin/orders/completed" element={<ManageOrders />} />
@@ -77,12 +83,13 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </Suspense>
-        </WishlistProvider>
-        </CartProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+          </Suspense>
+          </WishlistProvider>
+          </CartProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

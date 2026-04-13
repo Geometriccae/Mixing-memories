@@ -11,10 +11,21 @@ import {
   Menu,
   ChevronRight,
   ChevronDown,
-  Search,
   Moon,
-  Maximize2,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const isOrdersPath = (p: string) => p === "/admin/orders" || p.startsWith("/admin/orders/");
 const isTransactionsPath = (p: string) => p === "/admin/transactions" || p.startsWith("/admin/transactions/");
@@ -24,6 +35,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
   "/admin/products": "Product Management",
   "/admin/orders": "Orders",
+  "/admin/orders/overview": "Orders overview",
   "/admin/orders/placed": "Placed Orders",
   "/admin/orders/shipped": "Shipped Orders",
   "/admin/orders/completed": "Completed Orders",
@@ -44,9 +56,11 @@ function headerTitleForPath(pathname: string): string {
 const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [themeReady, setThemeReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(() => isOrdersPath(location.pathname));
-  const [transactionsOpen, setTransactionsOpen] = useState(() => isTransactionsPath(location.pathname));
   const [masterOpen, setMasterOpen] = useState(() => isMasterPath(location.pathname));
 
   useEffect(() => {
@@ -60,17 +74,26 @@ const AdminLayout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (isTransactionsPath(location.pathname)) setTransactionsOpen(true);
-  }, [location.pathname]);
-
-  useEffect(() => {
     if (isMasterPath(location.pathname)) setMasterOpen(true);
   }, [location.pathname]);
 
+  useEffect(() => {
+    setThemeReady(true);
+  }, []);
+
   const headerTitle = useMemo(() => headerTitleForPath(location.pathname), [location.pathname]);
 
-  const handleLogout = () => {
+  const isDark = (resolvedTheme ?? theme) === "dark";
+
+  const toggleTheme = () => {
+    setTheme(isDark ? "light" : "dark");
+  };
+
+  const confirmLogout = () => {
     sessionStorage.removeItem("admin_demo");
+    sessionStorage.removeItem("admin_token");
+    setLogoutOpen(false);
+    setSidebarOpen(false);
     navigate("/admin");
   };
 
@@ -89,13 +112,12 @@ const AdminLayout = () => {
     }`;
 
   const ordersParentActive = isOrdersPath(location.pathname);
-  const transactionsParentActive = isTransactionsPath(location.pathname);
   const masterParentActive = isMasterPath(location.pathname);
 
   return (
-    <div className="min-h-screen flex bg-muted">
+    <div className="min-h-screen bg-muted">
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transform transition-transform lg:translate-x-0 lg:static ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -106,7 +128,7 @@ const AdminLayout = () => {
           <p className="text-xs text-sidebar-foreground/60 mt-1">Admin Panel</p>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 pb-28">
+        <nav className="admin-sidebar-scroll flex-1 overflow-y-auto p-4 pb-28">
           <div className="px-4 pt-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">Main</div>
           <Link
             to="/admin/dashboard"
@@ -149,6 +171,14 @@ const AdminLayout = () => {
           </button>
           {ordersOpen && (
             <div className="mt-1 ml-4 pl-3 border-l border-sidebar-border space-y-0.5">
+              <Link
+                to="/admin/orders/overview"
+                onClick={() => setSidebarOpen(false)}
+                className={subLinkClass("/admin/orders/overview")}
+              >
+                <span className="text-sidebar-foreground/50 shrink-0">-</span>
+                <span>Orders overview &amp; charts</span>
+              </Link>
               {[
                 { to: "/admin/orders/placed", label: "Placed Orders" },
                 { to: "/admin/orders/shipped", label: "Shipped Orders" },
@@ -166,36 +196,22 @@ const AdminLayout = () => {
           <div className="px-4 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
             Transaction Management
           </div>
-          <button
-            type="button"
-            onClick={() => setTransactionsOpen((o) => !o)}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors w-full text-left ${
-              transactionsParentActive
-                ? "bg-sidebar-accent text-sidebar-primary"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50"
-            }`}
+          <Link
+            to="/admin/transactions/success"
+            onClick={() => setSidebarOpen(false)}
+            className={itemClass("/admin/transactions/success")}
           >
             <IndianRupee className="h-5 w-5 shrink-0" />
-            <span className="flex-1">Transactions</span>
-            {transactionsOpen ? (
-              <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
-            )}
-          </button>
-          {transactionsOpen && (
-            <div className="mt-1 ml-4 pl-3 border-l border-sidebar-border space-y-0.5">
-              {[
-                { to: "/admin/transactions/success", label: "Success Transaction" },
-                { to: "/admin/transactions/pending", label: "Pending Transaction" },
-              ].map(({ to, label }) => (
-                <Link key={to} to={to} onClick={() => setSidebarOpen(false)} className={subLinkClass(to)}>
-                  <span className="text-sidebar-foreground/50 shrink-0">-</span>
-                  <span>{label}</span>
-                </Link>
-              ))}
-            </div>
-          )}
+            Successful payments
+          </Link>
+          <Link
+            to="/admin/transactions/pending"
+            onClick={() => setSidebarOpen(false)}
+            className={itemClass("/admin/transactions/pending")}
+          >
+            <IndianRupee className="h-5 w-5 shrink-0" />
+            Pending payments
+          </Link>
 
           <div className="px-4 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
             Customer Management
@@ -249,7 +265,8 @@ const AdminLayout = () => {
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border bg-sidebar">
           <button
-            onClick={handleLogout}
+            type="button"
+            onClick={() => setLogoutOpen(true)}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 w-full transition-colors"
           >
             <LogOut className="h-5 w-5" /> Logout
@@ -259,41 +276,41 @@ const AdminLayout = () => {
 
       {sidebarOpen && <div className="fixed inset-0 bg-foreground/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <div className="flex-1 flex flex-col min-h-screen bg-[#f1f3f5]">
-        <header className="shrink-0 bg-[hsl(222_47%_14%)] text-white">
-          <div className="flex items-center gap-3 px-4 py-3 md:px-6">
+      <div className="flex flex-col h-[100dvh] min-h-0 overflow-hidden bg-muted lg:pl-64">
+        <header className="shrink-0 bg-sidebar text-sidebar-foreground border-b border-sidebar-border">
+          <div className="flex items-center gap-3 px-4 py-3 md:px-6 md:py-3.5">
             <button
               type="button"
-              className="lg:hidden p-2 rounded-md hover:bg-white/10 transition-colors"
+              className="lg:hidden shrink-0 p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-5 w-5 text-sidebar-foreground" />
             </button>
-            <div className="relative flex-1 max-w-xl min-w-0">
-              <input
-                type="search"
-                placeholder="Search for results..."
-                className="w-full rounded-lg bg-[hsl(222_40%_20%)] border border-white/10 px-4 py-2.5 pr-10 text-sm text-white placeholder:text-white/45 outline-none focus:ring-1 focus:ring-white/25"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55 pointer-events-none" />
-            </div>
-            <div className="flex items-center gap-2 md:gap-4 shrink-0 ml-auto">
-              <button type="button" className="p-2 rounded-md hover:bg-white/10 transition-colors" aria-label="Dark mode">
-                <Moon className="h-5 w-5 text-white/90" />
+            <h1 className="font-display text-lg sm:text-xl md:text-2xl font-bold text-sidebar-foreground tracking-tight truncate min-w-0 flex-1">
+              {headerTitle}
+            </h1>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                disabled={!themeReady}
+                className="p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors disabled:opacity-50"
+                aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+              >
+                {!themeReady ? (
+                  <Moon className="h-5 w-5 text-sidebar-foreground/90" />
+                ) : isDark ? (
+                  <Sun className="h-5 w-5 text-sidebar-foreground/90" />
+                ) : (
+                  <Moon className="h-5 w-5 text-sidebar-foreground/90" />
+                )}
               </button>
-              <button type="button" className="p-2 rounded-md hover:bg-white/10 transition-colors" aria-label="Fullscreen">
-                <Maximize2 className="h-5 w-5 text-white/90" />
-              </button>
-              <span className="text-sm font-medium text-white/95 hidden sm:inline">Admin</span>
+              <span className="text-xs sm:text-sm font-medium text-sidebar-foreground/90 pr-0.5 sm:pr-1">Admin</span>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-6 py-4 border-t border-white/10">
-            <h1 className="font-display text-xl md:text-2xl font-bold text-white tracking-tight">{headerTitle}</h1>
-            <span className="text-sm text-white/75">{headerTitle}</span>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 min-h-0">
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 md:p-6">
           <Outlet />
         </main>
         <footer className="shrink-0 bg-background border-t border-border py-4 px-4">
@@ -303,6 +320,23 @@ const AdminLayout = () => {
           </p>
         </footer>
       </div>
+
+      <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will leave the admin panel and need to sign in again to continue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button type="button" className={cn(buttonVariants(), "sm:mt-0")} onClick={confirmLogout}>
+              Log out
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

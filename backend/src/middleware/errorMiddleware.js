@@ -28,7 +28,17 @@ function errorHandler(err, _req, res, _next) {
   }
 
   if (err instanceof mongoose.Error.CastError) {
+    statusCode = 400;
     message = "Invalid resource id.";
+  }
+
+  // Mongo TLS / network: don't leak OpenSSL paths to the client
+  if (
+    /SSL|TLS|decryption failed|bad record mac|MongoNetworkError|MongoServerSelectionError/i.test(msg) &&
+    statusCode === 500
+  ) {
+    statusCode = 503;
+    message = "Could not load data from the database. Please refresh — if it keeps happening, check your network or VPN.";
   }
 
   res.status(statusCode).json({

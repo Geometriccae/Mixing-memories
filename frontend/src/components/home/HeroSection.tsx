@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import heroImg from "@/assets/hero-choco-crunchy-granola.png";
-import { products } from "@/data/mockData";
+import heroImg from "@/assets/hero-choco-crunchy-story.png";
 import chocoTicker from "@/assets/royal-oven-choco-crunchy.png";
 import mewaTicker from "@/assets/royal-oven-golden-jaggery-hero.png";
 
@@ -48,14 +47,19 @@ const HeroSection = () => (
           </div>
         </motion.div>
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.2 }}
-          className="relative hidden lg:block"
+          className="relative flex justify-center lg:justify-end"
         >
-          <div className="rounded-3xl overflow-hidden shadow-2xl">
-            <img src={heroImg} alt="Royal Oven Choco Crunchy Granola" width={1920} height={1080} className="w-full h-auto object-cover" />
-          </div>
+          <img
+            src={heroImg}
+            alt="Royal Oven Choco Crunchy Granola — Where every crunch tells a story"
+            width={1200}
+            height={800}
+            className="w-full max-w-md sm:max-w-lg lg:max-w-none h-auto max-h-[min(52vh,440px)] sm:max-h-[min(56vh,480px)] lg:max-h-[min(72vh,560px)] object-contain object-center"
+            decoding="async"
+          />
         </motion.div>
       </div>
     </section>
@@ -68,36 +72,39 @@ const HeroSection = () => (
       ];
       const loop = [...tickerItems, ...tickerItems];
       return (
-        <section className="relative border-y border-border/70 bg-gradient-to-b from-muted/40 via-background to-muted/30 py-10 md:py-14 overflow-hidden">
-          <div className="container relative mb-6 md:mb-8">
-            <p className="text-center font-display text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <section className="relative border-y border-border/70 bg-gradient-to-b from-muted/50 via-background to-muted/40 py-12 md:py-16 lg:py-20 overflow-hidden">
+          <div className="container relative mb-8 md:mb-10">
+            <p className="text-center font-display text-xs font-semibold uppercase tracking-[0.28em] text-primary/90">
               Featured picks
             </p>
-            <p className="text-center text-xs text-muted-foreground/80 mt-1 max-w-md mx-auto">
+            <h2 className="text-center font-display text-2xl md:text-3xl font-bold text-foreground mt-3 tracking-tight">
+              Crowd favourites
+            </h2>
+            <p className="text-center text-sm text-muted-foreground mt-2 max-w-lg mx-auto leading-relaxed">
               Popular items — same quality, straight from our catalog
             </p>
           </div>
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 md:w-24 bg-gradient-to-r from-background to-transparent" aria-hidden />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 md:w-24 bg-gradient-to-l from-background to-transparent" aria-hidden />
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 md:w-28 bg-gradient-to-r from-background via-background/80 to-transparent" aria-hidden />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 md:w-28 bg-gradient-to-l from-background via-background/80 to-transparent" aria-hidden />
           <div className="marquee flex w-max items-stretch">
             {loop.map((p, i) => (
               <div
                 key={`${p.name}-${i}`}
                 className="flex-shrink-0 mx-3 md:mx-5 first:ml-8 last:mr-8 md:first:ml-12 md:last:mr-12"
               >
-                <div className="flex h-full items-center gap-6 md:gap-10 rounded-2xl border border-border/80 bg-card px-6 py-5 md:px-10 md:py-7 shadow-[0_2px_16px_-4px_hsl(210_11%_15%/0.08)] ring-1 ring-border/40">
-                  <div className="flex h-28 w-28 md:h-36 md:w-36 shrink-0 items-center justify-center rounded-xl bg-muted/50 p-2">
-                    <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain" />
+                <div className="flex h-full items-center gap-3 md:gap-4 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-sm pl-3 pr-4 py-3 md:pl-3.5 md:pr-5 md:py-3.5 shadow-[0_4px_20px_-6px_hsl(210_11%_15%/0.1)] ring-1 ring-border/25 hover:shadow-[0_8px_28px_-8px_hsl(210_11%_15%/0.12)] transition-shadow duration-300">
+                  <div className="h-44 w-44 sm:h-48 sm:w-48 md:h-52 md:w-52 shrink-0 overflow-hidden rounded-xl">
+                    <img src={p.image} alt={p.name} className="h-full w-full object-contain object-center" />
                   </div>
-                  <div className="flex min-w-0 flex-col gap-1 pr-2 text-left">
-                    <span className="font-display text-lg font-semibold leading-snug text-foreground md:text-2xl md:leading-tight">
+                  <div className="flex min-w-0 flex-col gap-0.5 pr-1 text-left max-w-[10.5rem] sm:max-w-[12rem] md:max-w-[13.5rem]">
+                    <span className="font-display text-base font-semibold leading-snug text-foreground md:text-lg md:leading-tight">
                       {p.name}
                     </span>
-                    <div className="mt-2 flex flex-wrap items-baseline gap-2">
-                      <span className="font-display text-2xl font-bold tabular-nums text-primary md:text-4xl">
+                    <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5">
+                      <span className="font-display text-xl font-bold tabular-nums text-primary md:text-2xl">
                         ₹{p.price.toFixed(2)}
                       </span>
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">in store</span>
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">in store</span>
                     </div>
                   </div>
                 </div>

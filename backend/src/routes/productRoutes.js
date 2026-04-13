@@ -3,9 +3,11 @@ const upload = require("../config/multer");
 const {
   createProduct,
   getProducts,
+  getProductByBarcode,
   getProductImage,
   getProductVideo,
   getProductVariantImage,
+  getProductBarcodePng,
   getProductById,
   postProductsAvailability,
   updateProduct,
@@ -26,9 +28,11 @@ const productUpload = upload.uploadMemory.fields([
 
 router.post("/availability", postProductsAvailability);
 router.get("/", optionalAuth, getProducts);
+router.get("/lookup/barcode", optionalAuth, getProductByBarcode);
 router.get("/:id/image", getProductImage);
 router.get("/:id/video", getProductVideo);
 router.get("/:id/variant/:idx", getProductVariantImage);
+router.get("/:id/barcode", protect, authorize("admin"), getProductBarcodePng);
 router.get("/:id", optionalAuth, getProductById);
 router.post("/", protect, authorize("admin"), productUpload, createProduct);
 router.put("/:id", protect, authorize("admin"), productUpload, updateProduct);

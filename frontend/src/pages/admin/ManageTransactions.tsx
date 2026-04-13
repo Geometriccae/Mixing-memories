@@ -19,7 +19,7 @@ const ManageTransactions = () => {
     return <Navigate to="/admin/transactions/pending" replace />;
   }
 
-  const paymentFilter = pathname.includes("/success") ? "paid" : "pending";
+  const paymentFilter = pathname.includes("/transactions/success") ? "paid" : "pending";
 
   const [orders, setOrders] = useState<OrderDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +78,7 @@ const ManageTransactions = () => {
   const subtitle =
     paymentFilter === "paid"
       ? "Orders where payment has been confirmed."
-      : "Confirm COD / other payments here — customers will see “Successful” on their order after you update.";
+      : "Razorpay usually marks these paid automatically; use this list for edge cases or manual fixes.";
 
   return (
     <div className="rounded-xl bg-card border border-border/60 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.06)] overflow-hidden">
@@ -93,12 +93,13 @@ const ManageTransactions = () => {
           <p className="text-sm text-muted-foreground">No orders in this list.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm min-w-[860px]">
+            <table className="w-full text-sm min-w-[960px]">
               <thead>
                 <tr>
                   <th className={thClass}>Order ID</th>
                   <th className={thClass}>Date</th>
                   <th className={thClass}>Customer</th>
+                  <th className={thClass}>Mobile</th>
                   <th className={thClass}>Products</th>
                   <th className={`${thClass} text-right`}>Total</th>
                   <th className={thClass}>Pay method</th>
@@ -117,6 +118,9 @@ const ManageTransactions = () => {
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{o.customerName}</p>
                       <p className="text-xs text-muted-foreground truncate max-w-[200px]">{o.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-foreground tabular-nums whitespace-nowrap">
+                      {String(o.phone || "").trim() || "—"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground max-w-[280px] text-xs">{itemsSummary(o)}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium text-foreground">

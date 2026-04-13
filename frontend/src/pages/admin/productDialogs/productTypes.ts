@@ -17,4 +17,6 @@ export type AdminProductRow = {
   hasVideo: boolean;
   /** Up to 3 resolved URLs (null if no image) */
   variantImageUrls: (string | null)[];
+  /** Set on create (admin API only). Used for barcode PNG download. */
+  barcode?: string;
 };
