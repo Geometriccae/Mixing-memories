@@ -5,6 +5,7 @@ const {
   getOrdersByCustomerEmail,
   getMyOrders,
   cancelMyOrder,
+  abandonUnpaidMyOrder,
   updateOrderStatus,
   updateOrderPaymentStatus,
 } = require("../controllers/orderController");
@@ -14,6 +15,7 @@ const { authorize } = require("../middleware/roleMiddleware");
 const router = express.Router();
 
 router.post("/", protect, createOrder);
+router.delete("/:id/abandon", protect, abandonUnpaidMyOrder);
 router.patch("/:id/cancel", protect, cancelMyOrder);
 router.get("/my", protect, getMyOrders);
 router.get("/customer", getOrdersByCustomerEmail);

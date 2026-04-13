@@ -98,8 +98,12 @@ const AdminLogin = () => {
     <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <div className="w-full max-w-md bg-card rounded-2xl card-shadow p-8">
         <div className="text-center mb-8">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-            <Lock className="h-8 w-8 text-primary" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <img
+              src="/royal-oven-logo.png"
+              alt="Royal Oven"
+              className="h-20 w-auto max-w-[min(100%,320px)] object-contain object-center sm:h-24"
+            />
           </div>
           <h1 className="font-display text-2xl font-bold text-foreground">Admin Login</h1>
           <p className="text-muted-foreground text-sm mt-2">Enter your credentials to access the admin panel</p>
@@ -128,9 +132,6 @@ const AdminLogin = () => {
           <button type="submit" className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold hover:opacity-90 transition-opacity">
             Sign In
           </button>
-          <p className="text-center text-xs text-muted-foreground mt-4">
-            Demo: username <strong>admin</strong> / password <strong>admin</strong>
-          </p>
         </form>
       </div>
     </div>

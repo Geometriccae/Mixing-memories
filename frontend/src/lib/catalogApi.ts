@@ -1,4 +1,5 @@
 import type { Product } from "@/data/mockData";
+import { cacheProductDoc } from "@/lib/productDetailPrefetch";
 
 const apiBaseUrl = () => import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -36,8 +37,12 @@ function parseJsonData<T>(json: unknown): T[] {
   return Array.isArray(data) ? (data as T[]) : [];
 }
 
-export async function fetchPublicProducts(): Promise<ApiProductDoc[]> {
-  const res = await fetch(`${apiBaseUrl()}/api/products?page=1&limit=1000`);
+/** Default list size for storefront (avoid huge payloads + slow Atlas round-trips). */
+const DEFAULT_PRODUCT_LIST_LIMIT = 200;
+
+export async function fetchPublicProducts(limit: number = DEFAULT_PRODUCT_LIST_LIMIT): Promise<ApiProductDoc[]> {
+  const n = Math.min(500, Math.max(1, Math.floor(limit)));
+  const res = await fetch(`${apiBaseUrl()}/api/products?page=1&limit=${n}`);
   if (!res.ok) throw new Error("Failed to load products");
   const json: unknown = await res.json();
   return parseJsonData<ApiProductDoc>(json);
@@ -51,7 +56,42 @@ export async function fetchPublicProductById(id: string): Promise<ApiProductDoc 
   const json: unknown = await res.json();
   if (!json || typeof json !== "object" || !("data" in json)) return null;
   const data = (json as { data: unknown }).data;
-  return data && typeof data === "object" ? (data as ApiProductDoc) : null;
+  if (data && typeof data === "object") {
+    const doc = data as ApiProductDoc;
+    cacheProductDoc(trimmed, doc);
+    return doc;
+  }
+  return null;
+}
+
+function normalizeBarcodeClientInput(raw: string): string {
+  let s = String(raw || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\u2212|\u2013|\u2014/g, "-")
+    .trim()
+    .replace(/\s+/g, " ");
+  s = s.replace(/^RO\s*-\s*/i, "RO-");
+  return s.toUpperCase();
+}
+
+/** Resolve retail barcode (e.g. from a scanner) to Mongo product id for routing to product detail. */
+export async function lookupProductByBarcode(barcode: string): Promise<string | null> {
+  const q = normalizeBarcodeClientInput(barcode);
+  if (!q) return null;
+  const res = await fetch(`${apiBaseUrl()}/api/products/lookup/barcode?q=${encodeURIComponent(q)}`);
+  if (res.status === 404) return null;
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Barcode lookup failed.");
+  }
+  if (!json || typeof json !== "object" || !("data" in json)) return null;
+  const data = (json as { data: unknown }).data;
+  if (!data || typeof data !== "object" || !("_id" in data)) return null;
+  const id = (data as { _id?: unknown })._id;
+  return id != null ? String(id) : null;
 }
 
 /** Use on cart/checkout only — returns how many units can be ordered (current stock). */
@@ -74,11 +114,11 @@ export async function fetchProductsAvailability(productIds: string[]): Promise<R
 }
 
 function resolveProductImageUrl(p: ApiProductDoc): string {
-  if (p.hasImage === false) return "";
-  const id = p._id ? String(p._id) : "";
   if (p.imageUrl && p.imageUrl.startsWith("/")) {
     return `${apiBaseUrl()}${p.imageUrl}`;
   }
+  if (p.hasImage === false) return "";
+  const id = p._id ? String(p._id) : "";
   if (p.image && p.image.startsWith("/uploads/")) {
     return `${apiBaseUrl()}${p.image}`;
   }

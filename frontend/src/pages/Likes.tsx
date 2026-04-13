@@ -20,7 +20,7 @@ const Likes = () => {
     (async () => {
       setLoading(true);
       try {
-        const apiProducts = await fetchPublicProducts();
+        const apiProducts = await fetchPublicProducts(500);
         if (cancelled) return;
         const mapped = apiProducts
           .map((p) => mapApiProductToProduct(p, goldenJaggeryWhite))

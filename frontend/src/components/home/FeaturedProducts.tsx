@@ -15,7 +15,7 @@ const FeaturedProducts = () => {
     let cancelled = false;
     (async () => {
       try {
-        const apiProducts = await fetchPublicProducts();
+        const apiProducts = await fetchPublicProducts(FEATURED_LIMIT + 4);
         if (cancelled) return;
         const mapped = apiProducts
           .map((p) => mapApiProductToProduct(p, goldenJaggeryWhite))

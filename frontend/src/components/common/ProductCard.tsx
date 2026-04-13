@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Link } from "react-router-dom";
+import { prefetchProductDetail } from "@/lib/productDetailPrefetch";
+import { discountPercentOff } from "@/lib/productPricing";
 import { toast } from "sonner";
 import { Product } from "@/data/mockData";
 import { useCart } from "@/contexts/CartContext";
@@ -10,12 +12,19 @@ const ProductCard = ({ product }: { product: Product }) => {
   const { addToCart } = useCart();
   const { isLiked, toggleLike } = useWishlist();
   const liked = isLiked(product.id);
+  const discountPct =
+    product.originalPrice != null ? discountPercentOff(product.originalPrice, product.price) : null;
   return (
     <motion.div
       whileHover={{ y: -6 }}
       className="group bg-card rounded-xl overflow-hidden card-shadow hover:card-shadow-hover transition-shadow duration-300"
     >
-      <Link to={`/products/${product.id}`} className="block text-left">
+      <Link
+        to={`/products/${product.id}`}
+        className="block text-left"
+        onMouseEnter={() => prefetchProductDetail(product.id)}
+        onFocus={() => prefetchProductDetail(product.id)}
+      >
         <div className="relative overflow-hidden aspect-square bg-muted">
           {product.hasCoverImage === false && product.videoUrl ? (
             <video
@@ -33,6 +42,7 @@ const ProductCard = ({ product }: { product: Product }) => {
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
+              decoding="async"
             />
           )}
           {product.outOfStock ? (
@@ -105,11 +115,16 @@ const ProductCard = ({ product }: { product: Product }) => {
             ))}
             <span className="text-xs text-muted-foreground ml-1">({product.rating})</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {discountPct != null ? (
+              <span className="text-xs font-semibold tabular-nums px-2 py-0.5 rounded-md bg-primary/15 text-primary">
+                {discountPct}% off
+              </span>
+            ) : null}
             <span className="text-lg font-bold text-primary">₹{product.price.toFixed(2)}</span>
-            {product.originalPrice && (
+            {product.originalPrice != null ? (
               <span className="text-sm text-muted-foreground line-through">₹{product.originalPrice.toFixed(2)}</span>
-            )}
+            ) : null}
           </div>
         </div>
       </Link>

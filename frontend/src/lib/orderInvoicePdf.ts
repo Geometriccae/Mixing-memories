@@ -61,6 +61,8 @@ function paymentMethodLabel(pm: string | undefined): string {
   const p = String(pm || "").toLowerCase();
   if (p === "cod") return "Cash on delivery";
   if (p === "upi") return "UPI";
+  if (p === "netbanking") return "Net banking";
+  if (p === "card") return "Card";
   if (p === "online") return "Online payment";
   return pm ? pm.toUpperCase() : "—";
 }

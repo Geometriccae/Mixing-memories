@@ -3,9 +3,11 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { bustDetailJsonCache } = require("../utils/productDetailJsonCache");
+const { withMongoOpRetry } = require("../utils/mongoReadRetry");
 
 const ALLOWED_STATUSES = ["placed", "shipped", "completed", "cancelled"];
-const ALLOWED_PAYMENT_METHODS = ["cod", "upi", "online"];
+const ALLOWED_PAYMENT_METHODS = ["upi", "netbanking", "card"];
 const ALLOWED_PAYMENT_STATUS = ["pending", "paid", "failed"];
 
 async function restockOrderItems(items) {
@@ -15,7 +17,8 @@ async function restockOrderItems(items) {
     if (!pid || !mongoose.Types.ObjectId.isValid(String(pid))) continue;
     const qty = Math.floor(Number(row.quantity));
     if (!Number.isFinite(qty) || qty < 1) continue;
-    await Product.findByIdAndUpdate(pid, { $inc: { stock: qty } });
+    await withMongoOpRetry(() => Product.findByIdAndUpdate(pid, { $inc: { stock: qty } }));
+    bustDetailJsonCache(String(pid));
   }
 }
 
@@ -65,7 +68,7 @@ async function allocateOrderNumber() {
     const day = String(d.getDate()).padStart(2, "0");
     const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
     const orderNumber = `MM-${y}${mo}${day}-${rand}`;
-    const exists = await Order.findOne({ orderNumber }).select("_id").lean();
+    const exists = await withMongoOpRetry(() => Order.findOne({ orderNumber }).select("_id").lean());
     if (!exists) return orderNumber;
   }
   throw new ApiError(500, "Could not allocate order id. Please try again.");
@@ -82,7 +85,7 @@ const createOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  const pm = paymentMethod ? String(paymentMethod).trim().toLowerCase() : "cod";
+  const pm = paymentMethod ? String(paymentMethod).trim().toLowerCase() : "upi";
   if (!ALLOWED_PAYMENT_METHODS.includes(pm)) {
     throw new ApiError(400, `paymentMethod must be one of: ${ALLOWED_PAYMENT_METHODS.join(", ")}`);
   }
@@ -107,13 +110,15 @@ const createOrder = asyncHandler(async (req, res) => {
 
   try {
     for (const item of items) {
-      const updated = await Product.findOneAndUpdate(
-        { _id: item.productId, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { new: true }
+      const updated = await withMongoOpRetry(() =>
+        Product.findOneAndUpdate(
+          { _id: item.productId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          { new: true },
+        ),
       );
       if (!updated) {
-        const p = await Product.findById(item.productId);
+        const p = await withMongoOpRetry(() => Product.findById(item.productId));
         const avail = p ? Math.max(0, Math.floor(Number(p.stock) || 0)) : 0;
         throw new ApiError(400, `Not enough stock for "${item.name}". Only ${avail} available.`);
       }
@@ -121,38 +126,72 @@ const createOrder = asyncHandler(async (req, res) => {
     }
 
     const orderNumber = await allocateOrderNumber();
-    const order = await Order.create({
-      orderNumber,
-      userId: u._id,
-      customerName: snapName,
-      email: snapEmail,
-      phone: snapPhone,
-      shippingAddress,
-      paymentMethod: pm,
-      paymentStatus: pm === "cod" ? "pending" : "pending",
-      items,
-      totalAmount,
-      status: "placed",
-    });
+    const order = await withMongoOpRetry(() =>
+      Order.create({
+        orderNumber,
+        userId: u._id,
+        customerName: snapName,
+        email: snapEmail,
+        phone: snapPhone,
+        shippingAddress,
+        paymentMethod: pm,
+        paymentStatus: "pending",
+        items,
+        totalAmount,
+        status: "placed",
+      }),
+    );
 
-    const saved = await Order.findById(order._id).lean();
+    const saved = await withMongoOpRetry(() => Order.findById(order._id).lean());
+    for (const item of items) {
+      if (item.productId) bustDetailJsonCache(String(item.productId));
+    }
     res.status(201).json({ success: true, data: saved });
   } catch (err) {
     for (const d of decremented.reverse()) {
-      await Product.findByIdAndUpdate(d.id, { $inc: { stock: d.qty } });
+      await withMongoOpRetry(() => Product.findByIdAndUpdate(d.id, { $inc: { stock: d.qty } }));
     }
     throw err;
   }
 });
 
+function parseDayBoundary(raw, endOfDay) {
+  if (raw == null || String(raw).trim() === "") return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const parts = s.split("-").map((x) => parseInt(x, 10));
+    const y = parts[0];
+    const mo = parts[1];
+    const da = parts[2];
+    if (!y || mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+    if (endOfDay) return new Date(y, mo - 1, da, 23, 59, 59, 999);
+    return new Date(y, mo - 1, da, 0, 0, 0, 0);
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 const listOrders = asyncHandler(async (req, res) => {
-  const { status, paymentStatus } = req.query;
+  const { status, paymentStatus, from, to } = req.query;
   const filter = {};
   if (status && ALLOWED_STATUSES.includes(String(status))) {
     filter.status = String(status);
   }
   if (paymentStatus && ALLOWED_PAYMENT_STATUS.includes(String(paymentStatus))) {
     filter.paymentStatus = String(paymentStatus);
+  }
+  let fromD = parseDayBoundary(from, false);
+  let toD = parseDayBoundary(to, true);
+  if (fromD && toD && fromD.getTime() > toD.getTime()) {
+    const f = from;
+    const t = to;
+    fromD = parseDayBoundary(t, false);
+    toD = parseDayBoundary(f, true);
+  }
+  if (fromD || toD) {
+    filter.createdAt = {};
+    if (fromD) filter.createdAt.$gte = fromD;
+    if (toD) filter.createdAt.$lte = toD;
   }
   const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
   res.json({ success: true, data: orders });
@@ -194,6 +233,29 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
   await order.save();
   const out = await Order.findById(order._id).lean();
   res.json({ success: true, data: out });
+});
+
+/** Remove an unpaid placed order (e.g. user closed Razorpay during checkout). Restocks items; no cancelled row. */
+const abandonUnpaidMyOrder = asyncHandler(async (req, res) => {
+  if (!req.user) throw new ApiError(401, "Not authorized.");
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid order id.");
+  }
+  const order = await Order.findOne({ _id: id, userId: req.user._id });
+  if (!order) throw new ApiError(404, "Order not found.");
+  if (order.status !== "placed") {
+    throw new ApiError(400, "Only open orders can be removed this way.");
+  }
+  if (String(order.paymentStatus || "").toLowerCase() !== "pending") {
+    throw new ApiError(400, "Only orders with pending payment can be abandoned.");
+  }
+  await restockOrderItems(order.items);
+  for (const item of order.items) {
+    if (item.productId) bustDetailJsonCache(String(item.productId));
+  }
+  await Order.deleteOne({ _id: order._id });
+  res.json({ success: true, data: { removed: true } });
 });
 
 const updateOrderStatus = asyncHandler(async (req, res) => {
@@ -261,6 +323,7 @@ module.exports = {
   getOrdersByCustomerEmail,
   getMyOrders,
   cancelMyOrder,
+  abandonUnpaidMyOrder,
   updateOrderStatus,
   updateOrderPaymentStatus,
 };

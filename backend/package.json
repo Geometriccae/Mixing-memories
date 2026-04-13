@@ -10,13 +10,19 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "bwip-js": "^4.5.1",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "morgan": "^1.10.1",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "razorpay": "^2.9.6"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

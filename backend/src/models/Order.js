@@ -33,8 +33,14 @@ const orderSchema = new mongoose.Schema(
     phone: { type: String, default: "", trim: true },
     /** Shipping address snapshot at order time */
     shippingAddress: { type: addressSchema, default: () => ({}) },
-    paymentMethod: { type: String, enum: ["cod", "upi", "online"], default: "cod" },
+    /** Legacy: cod, online — still allowed on old documents */
+    paymentMethod: {
+      type: String,
+      enum: ["cod", "upi", "online", "netbanking", "card"],
+      default: "upi",
+    },
     paymentStatus: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
+    razorpayOrderId: { type: String, default: "", trim: true },
     items: {
       type: [orderItemSchema],
       required: true,

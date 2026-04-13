@@ -52,6 +52,50 @@
     --font-display: 'Playfair Display', serif;
     --font-body: 'Inter', sans-serif;
   }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 40% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 40% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 168 50% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 43 90% 48%;
+    --secondary-foreground: 222 47% 8%;
+
+    --muted: 217 33% 16%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 168 25% 18%;
+    --accent-foreground: 168 40% 88%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 28% 20%;
+    --input: 217 28% 20%;
+    --ring: 168 50% 45%;
+
+    --hero-gradient: linear-gradient(135deg, hsl(168 50% 45% / 0.12), hsl(43 90% 48% / 0.1));
+    --card-shadow: 0 4px 24px -4px hsl(0 0% 0% / 0.35);
+    --card-shadow-hover: 0 12px 32px -8px hsl(168 50% 45% / 0.2);
+
+    /* Admin sidebar / header: same brand strip in dark app shell */
+    --sidebar-background: 168 30% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 168 55% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 168 28% 16%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 168 22% 18%;
+    --sidebar-ring: 168 55% 48%;
+  }
 }
 
 @layer base {
@@ -91,6 +135,26 @@
   }
   .marquee {
     animation: marquee 32s linear infinite;
+  }
+
+  /** Admin sidebar nav — slim scrollbar using sidebar theme tokens */
+  .admin-sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--sidebar-border) / 0.85) hsl(var(--sidebar-background));
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar-track {
+    background: hsl(var(--sidebar-background));
+    border-radius: 9999px;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--sidebar-border) / 0.9);
+    border-radius: 9999px;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--sidebar-primary) / 0.45);
   }
 
   @media (prefers-reduced-motion: reduce) {

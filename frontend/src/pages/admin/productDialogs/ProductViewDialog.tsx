@@ -1,6 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { AdminProductRow } from "./productTypes";
+import AdminBarcodePreview from "./AdminBarcodePreview";
 
 type Props = {
   open: boolean;
@@ -62,6 +63,19 @@ const ProductViewDialog = ({ open, onOpenChange, product }: Props) => {
                         <p className="text-sm font-bold text-[hsl(222_60%_26%)]">Min stock</p>
                         <p className="text-base font-bold text-[hsl(222_60%_22%)] mt-0.5">{product.minStock}</p>
                       </div>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-background/80 p-3 sm:p-4">
+                      <p className="text-sm font-bold text-[hsl(222_60%_26%)]">Barcode</p>
+                      {product.barcode ? (
+                        <>
+                          <p className="text-sm font-mono font-semibold text-[hsl(222_60%_22%)] mt-1.5 tracking-wide break-all">
+                            {product.barcode}
+                          </p>
+                          <AdminBarcodePreview value={product.barcode} />
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground mt-1.5">—</p>
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-bold text-[hsl(222_60%_26%)]">Description</p>
