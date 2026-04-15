@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { patchShopStateRequest } from "@/lib/authApi";
 
 const LEGACY_LIKES_KEY = "royal_oven_liked_product_ids";
 
@@ -49,6 +50,11 @@ function saveLikes(userId: string, ids: string[]) {
   }
 }
 
+function toLikes(saved: string[] | undefined): string[] {
+  if (!Array.isArray(saved)) return [];
+  return saved.filter((x): x is string => typeof x === "string" && x.length > 0);
+}
+
 type WishlistContextValue = {
   likedIds: readonly string[];
   likeCount: number;
@@ -59,42 +65,85 @@ type WishlistContextValue = {
 const WishlistContext = createContext<WishlistContextValue | null>(null);
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, token } = useAuth();
   const userId = !isLoading ? (user?.id ?? "guest") : null;
 
   const [likedIds, setLikedIds] = useState<string[]>([]);
   const prevUserRef = useRef<string | null>(null);
+  const skipNextSaveRef = useRef(true);
+  const serverSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const serverLikesSig = useMemo(
+    () => (user?.id ? JSON.stringify(user.savedLikes ?? []) : ""),
+    [user?.id, user?.savedLikes],
+  );
 
   useEffect(() => {
     if (isLoading || userId === null) return;
 
+    skipNextSaveRef.current = true;
     setLikedIds((current) => {
       const prev = prevUserRef.current;
 
       if (prev === null) {
         prevUserRef.current = userId;
+        if (user && user.id === userId) {
+          const serverLikes = toLikes(user.savedLikes);
+          if (serverLikes.length > 0) return serverLikes;
+          return readLikes(userId);
+        }
         return readLikes(userId);
       }
 
       if (prev !== userId) {
         saveLikes(prev, current);
         prevUserRef.current = userId;
+
+        if (user && user.id === userId) {
+          const serverLikes = toLikes(user.savedLikes);
+          if (serverLikes.length > 0) return serverLikes;
+          if (prev === "guest") {
+            const guestLikes = readLikes("guest");
+            if (guestLikes.length > 0) return guestLikes;
+          }
+          return readLikes(userId);
+        }
         return readLikes(userId);
       }
 
       return current;
     });
-  }, [isLoading, userId]);
+  }, [isLoading, userId, user?.id]);
+
+  useEffect(() => {
+    if (isLoading || userId === null || userId === "guest" || !user || user.id !== userId) return;
+    const remote = toLikes(user.savedLikes);
+    if (remote.length === 0) return;
+    setLikedIds((cur) => (JSON.stringify(cur) === JSON.stringify(remote) ? cur : remote));
+    skipNextSaveRef.current = true;
+  }, [isLoading, userId, user?.id, serverLikesSig]);
 
   useEffect(() => {
     if (isLoading || userId === null) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
     saveLikes(userId, likedIds);
   }, [likedIds, userId, isLoading]);
 
-  const isLiked = useCallback(
-    (productId: string) => likedIds.includes(productId),
-    [likedIds],
-  );
+  useEffect(() => {
+    if (isLoading || userId === null || userId === "guest" || !token) return;
+    if (serverSyncRef.current) clearTimeout(serverSyncRef.current);
+    serverSyncRef.current = setTimeout(() => {
+      void patchShopStateRequest(token, { likes: [...likedIds] }).catch(() => {});
+    }, 700);
+    return () => {
+      if (serverSyncRef.current) clearTimeout(serverSyncRef.current);
+    };
+  }, [likedIds, token, userId, isLoading]);
+
+  const isLiked = useCallback((productId: string) => likedIds.includes(productId), [likedIds]);
 
   const toggleLike = useCallback((productId: string) => {
     const id = String(productId || "").trim();

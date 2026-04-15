@@ -3,6 +3,8 @@ import { MapPin, Phone, Mail, Facebook, Instagram, Globe, Smartphone, FileText }
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
 
 const WHATSAPP_CHAT_URL = "https://wa.me/917338843363";
+const FACEBOOK_URL = "https://www.facebook.com/RO.RoyalOven";
+const INSTAGRAM_URL = "https://www.instagram.com/the.royaloven/";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -32,9 +34,11 @@ const Footer = () => (
           <p className="text-sm leading-relaxed mb-6">Your one-stop shop for quality groceries. Fresh produce, artisan bakery, and daily essentials delivered to your door.</p>
           <div className="flex flex-wrap gap-3">
             <a
-              href="#"
+              href={FACEBOOK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="h-10 w-10 rounded-full bg-background/10 flex items-center justify-center hover:bg-primary transition-colors"
-              aria-label="Facebook"
+              aria-label="Royal Oven on Facebook"
             >
               <Facebook className="h-4 w-4" />
             </a>
@@ -48,9 +52,11 @@ const Footer = () => (
               <WhatsAppIcon className="h-4 w-4" />
             </a>
             <a
-              href="#"
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="h-10 w-10 rounded-full bg-background/10 flex items-center justify-center hover:bg-primary transition-colors"
-              aria-label="Instagram"
+              aria-label="Royal Oven on Instagram"
             >
               <Instagram className="h-4 w-4" />
             </a>

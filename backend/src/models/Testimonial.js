@@ -6,6 +6,8 @@ const testimonialSchema = new mongoose.Schema(
     text: { type: String, required: true, trim: true },
     rating: { type: Number, default: 5, min: 1, max: 5 },
     avatar: { type: String, default: "", trim: true },
+    /** Customer submissions start as pending; admin-approved reviews show on the storefront. */
+    status: { type: String, enum: ["pending", "approved"], default: "approved" },
   },
   { timestamps: true }
 );

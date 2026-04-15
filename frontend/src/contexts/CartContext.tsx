@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { Product } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
+import { patchShopStateRequest, type SavedCartLine } from "@/lib/authApi";
 
 export type CartLine = {
   productId: string;
@@ -25,9 +26,7 @@ type CartContextValue = {
   setQuantity: (productId: string, quantity: number) => void;
   removeLine: (productId: string) => void;
   clearCart: () => void;
-  /** Replace cart (e.g. restore after abandoning checkout). */
   replaceCart: (lines: CartLine[]) => void;
-  /** Add quantities back for one line (e.g. single-item checkout cancelled). */
   mergeLine: (line: CartLine) => void;
   itemCount: number;
   subtotal: number;
@@ -73,38 +72,100 @@ function saveCart(userId: string, items: CartLine[]) {
   }
 }
 
+function toCartLines(saved: SavedCartLine[] | undefined): CartLine[] {
+  if (!Array.isArray(saved)) return [];
+  return saved
+    .filter((l) => l && typeof l.productId === "string" && typeof l.name === "string" && typeof l.price === "number")
+    .map((l) => ({
+      productId: l.productId,
+      name: l.name,
+      price: l.price,
+      image: typeof l.image === "string" ? l.image : "",
+      quantity: Math.max(1, Math.floor(Number(l.quantity))),
+    }));
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, token } = useAuth();
   const userId = !isLoading ? (user?.id ?? "guest") : null;
 
   const [items, setItems] = useState<CartLine[]>([]);
   const prevUserRef = useRef<string | null>(null);
+  const skipNextSaveRef = useRef(true);
+  const serverSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const serverCartSig = useMemo(
+    () => (user?.id ? JSON.stringify(user.savedCart ?? []) : ""),
+    [user?.id, user?.savedCart],
+  );
+
+  /** Hydrate when account switches (guest ↔ user or login). */
   useEffect(() => {
     if (isLoading || userId === null) return;
 
+    skipNextSaveRef.current = true;
     setItems((current) => {
       const prev = prevUserRef.current;
 
       if (prev === null) {
         prevUserRef.current = userId;
+        if (user && user.id === userId) {
+          const serverLines = toCartLines(user.savedCart);
+          if (serverLines.length > 0) return serverLines;
+          return readCart(userId);
+        }
         return readCart(userId);
       }
 
       if (prev !== userId) {
         saveCart(prev, current);
         prevUserRef.current = userId;
+
+        if (user && user.id === userId) {
+          const serverLines = toCartLines(user.savedCart);
+          if (serverLines.length > 0) return serverLines;
+          if (prev === "guest") {
+            const guestLines = readCart("guest");
+            if (guestLines.length > 0) return guestLines;
+          }
+          return readCart(userId);
+        }
         return readCart(userId);
       }
 
       return current;
     });
-  }, [isLoading, userId]);
+  }, [isLoading, userId, user?.id]);
+
+  /** When /me returns server cart for the same account (e.g. other browser), apply if non-empty. */
+  useEffect(() => {
+    if (isLoading || userId === null || userId === "guest" || !user || user.id !== userId) return;
+    const remote = toCartLines(user.savedCart);
+    if (remote.length === 0) return;
+    setItems((cur) => (JSON.stringify(cur) === JSON.stringify(remote) ? cur : remote));
+    skipNextSaveRef.current = true;
+  }, [isLoading, userId, user?.id, serverCartSig]);
 
   useEffect(() => {
     if (isLoading || userId === null) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
     saveCart(userId, items);
   }, [items, userId, isLoading]);
+
+  /** Persist cart on the user account (cross-browser), plus localStorage above. */
+  useEffect(() => {
+    if (isLoading || userId === null || userId === "guest" || !token) return;
+    if (serverSyncRef.current) clearTimeout(serverSyncRef.current);
+    serverSyncRef.current = setTimeout(() => {
+      void patchShopStateRequest(token, { cart: items }).catch(() => {});
+    }, 700);
+    return () => {
+      if (serverSyncRef.current) clearTimeout(serverSyncRef.current);
+    };
+  }, [items, token, userId, isLoading]);
 
   const addToCart = useCallback((product: Product, qty = 1) => {
     if (product.outOfStock) return;

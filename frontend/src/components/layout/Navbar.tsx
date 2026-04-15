@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, LogOut, Search, ShoppingCart, Heart, User, Menu, X } from "lucide-react";
@@ -8,7 +8,9 @@ import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-import { lookupProductByBarcode } from "@/lib/catalogApi";
+import { fetchPublicProductsSearch, lookupProductByBarcode, mapApiProductToProduct } from "@/lib/catalogApi";
+import type { Product } from "@/data/mockData";
+import goldenJaggeryWhite from "@/assets/royal-oven-golden-jaggery-white.png";
 
 const navLinks: { path: string; label: string; authForPath?: string }[] = [
   { path: "/", label: "Home" },
@@ -21,6 +23,10 @@ const navLinks: { path: string; label: string; authForPath?: string }[] = [
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [headerSearch, setHeaderSearch] = useState("");
+  const [searchHits, setSearchHits] = useState<Product[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { itemCount } = useCart();
@@ -28,6 +34,65 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const profileLabel = user ? (user.name.split(/\s+/)[0] ?? "Profile") : "";
+
+  const runProductSearch = useCallback(async (raw: string) => {
+    const q = raw.trim();
+    if (q.length < 2) {
+      setSearchHits([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    try {
+      const docs = await fetchPublicProductsSearch(q, 12);
+      const mapped = docs
+        .map((p) => mapApiProductToProduct(p, goldenJaggeryWhite))
+        .filter((p): p is Product => p !== null);
+      setSearchHits(mapped);
+    } catch {
+      setSearchHits([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const q = headerSearch.trim();
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (q.length < 2) {
+      setSearchHits([]);
+      setSearchLoading(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      void runProductSearch(q);
+    }, 320);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [headerSearch, runProductSearch]);
+
+  const submitHeaderSearch = () => {
+    const q = headerSearch.trim();
+    if (!q) return;
+    void (async () => {
+      try {
+        const id = await lookupProductByBarcode(q);
+        if (id) {
+          setHeaderSearch("");
+          setSearchOpen(false);
+          setMobileOpen(false);
+          navigate(`/products/${id}`);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      navigate(`/products?q=${encodeURIComponent(q)}`);
+      setSearchOpen(false);
+      setMobileOpen(false);
+    })();
+  };
 
   return (
     <>
@@ -67,35 +132,59 @@ const Navbar = () => {
 
           {/* Search bar - desktop */}
           <form
-            className="hidden lg:flex items-center bg-muted rounded-full px-4 py-2 flex-1 max-w-md mx-8"
+            className="hidden lg:block relative flex-1 max-w-md mx-8"
             onSubmit={(e) => {
               e.preventDefault();
-              const q = headerSearch.trim();
-              if (!q) return;
-              void (async () => {
-                try {
-                  const id = await lookupProductByBarcode(q);
-                  if (id) {
-                    setHeaderSearch("");
-                    navigate(`/products/${id}`);
-                    return;
-                  }
-                } catch {
-                  /* toast below */
-                }
-                toast.error("No product for this barcode. Try another code or browse Products.");
-              })();
+              submitHeaderSearch();
             }}
           >
-            <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" aria-hidden />
-            <input
-              type="text"
-              value={headerSearch}
-              onChange={(e) => setHeaderSearch(e.target.value)}
-              placeholder="Product barcode…"
-              autoComplete="off"
-              className="bg-transparent outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground min-w-0"
-            />
+            <div className="flex items-center bg-muted rounded-full px-4 py-2">
+              <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" aria-hidden />
+              <input
+                type="text"
+                value={headerSearch}
+                onChange={(e) => {
+                  setHeaderSearch(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setSearchOpen(false), 180);
+                }}
+                placeholder="Search products…"
+                autoComplete="off"
+                className="bg-transparent outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground min-w-0"
+              />
+            </div>
+            {searchOpen && headerSearch.trim().length >= 2 ? (
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-border bg-card shadow-lg max-h-80 overflow-auto">
+                {searchLoading ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">Searching…</p>
+                ) : searchHits.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">No matches — press Enter to see all search results</p>
+                ) : (
+                  <ul className="py-1">
+                    {searchHits.map((p) => (
+                      <li key={p.id}>
+                        <Link
+                          to={`/products/${p.id}`}
+                          className="flex items-center gap-3 px-3 py-2 hover:bg-muted/60 text-left"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setHeaderSearch("");
+                            setSearchOpen(false);
+                          }}
+                        >
+                          <img src={p.image} alt="" className="h-10 w-10 rounded-md object-cover border border-border shrink-0" />
+                          <span className="text-sm font-medium text-foreground truncate">{p.name}</span>
+                          <span className="text-xs text-primary font-semibold ml-auto shrink-0">₹{p.price.toFixed(2)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
           </form>
 
           {/* Desktop links */}
@@ -263,33 +352,15 @@ const Navbar = () => {
                 >
                   Liked products{likeCount > 0 ? ` (${likeCount})` : ""}
                 </Link>
-                <Link to="/admin" onClick={() => setMobileOpen(false)} className="text-sm font-medium py-2 text-muted-foreground">
-                  Admin Panel
-                </Link>
                 <form
                   className="pt-2 border-t border-border mt-1"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const q = headerSearch.trim();
-                    if (!q) return;
-                    void (async () => {
-                      try {
-                        const id = await lookupProductByBarcode(q);
-                        if (id) {
-                          setHeaderSearch("");
-                          setMobileOpen(false);
-                          navigate(`/products/${id}`);
-                          return;
-                        }
-                      } catch {
-                        /* */
-                      }
-                      toast.error("No product for this barcode.");
-                    })();
+                    submitHeaderSearch();
                   }}
                 >
                   <label htmlFor="mobile-barcode-search" className="sr-only">
-                    Barcode lookup
+                    Search products
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -297,7 +368,7 @@ const Navbar = () => {
                       type="text"
                       value={headerSearch}
                       onChange={(e) => setHeaderSearch(e.target.value)}
-                      placeholder="Barcode…"
+                      placeholder="Search products…"
                       autoComplete="off"
                       className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
                     />

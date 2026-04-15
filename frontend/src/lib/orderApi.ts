@@ -15,6 +15,8 @@ export type ShippingAddressPayload = {
   state: string;
   pincode: string;
   country: string;
+  phone?: string;
+  phoneAlt?: string;
 };
 
 export type CreateOrderPayload = {
@@ -257,4 +259,81 @@ export async function abandonUnpaidOrder(token: string, orderId: string): Promis
     const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
     throw new Error(msg || "Could not remove unpaid order.");
   }
+}
+
+/** Razorpay bundle + session id from POST /api/checkout/session (no Order row until pay succeeds/fails). */
+export type CheckoutSessionBundle = RazorpayCheckoutBundle & { sessionId: string };
+
+export async function startCheckoutSession(token: string, payload: CreateOrderPayload): Promise<CheckoutSessionBundle> {
+  const res = await fetch(`${apiBaseUrl()}/api/checkout/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Could not start checkout.");
+  }
+  const data = parseData<CheckoutSessionBundle>(json);
+  if (!data?.sessionId || !data.keyId || !data.razorpayOrderId || typeof data.amount !== "number") {
+    throw new Error("Invalid checkout session.");
+  }
+  return data;
+}
+
+export async function verifyCheckoutSessionPayment(
+  token: string,
+  sessionId: string,
+  razorpay_order_id: string,
+  razorpay_payment_id: string,
+  razorpay_signature: string,
+): Promise<OrderDoc> {
+  const res = await fetch(`${apiBaseUrl()}/api/checkout/session/${encodeURIComponent(sessionId)}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature }),
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Payment verification failed.");
+  }
+  const data = parseData<OrderDoc>(json);
+  if (!data || !data._id) throw new Error("Invalid verify response.");
+  return data;
+}
+
+export async function abandonCheckoutSession(token: string, sessionId: string): Promise<void> {
+  const res = await fetch(`${apiBaseUrl()}/api/checkout/session/${encodeURIComponent(sessionId)}/abandon`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Could not cancel checkout.");
+  }
+}
+
+/** After Razorpay `payment.failed` — creates a failed Order row; session is removed server-side. */
+export async function markCheckoutSessionPaymentFailed(token: string, sessionId: string): Promise<OrderDoc | null> {
+  const res = await fetch(`${apiBaseUrl()}/api/checkout/session/${encodeURIComponent(sessionId)}/payment-failed`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Could not record payment failure.");
+  }
+  const data =
+    json && typeof json === "object" && "data" in json ? (json as { data: unknown }).data : undefined;
+  if (data && typeof data === "object" && "alreadyHandled" in data && (data as { alreadyHandled?: boolean }).alreadyHandled) {
+    return null;
+  }
+  if (data && typeof data === "object" && "_id" in data && String((data as { _id: unknown })._id)) {
+    return data as OrderDoc;
+  }
+  return null;
 }

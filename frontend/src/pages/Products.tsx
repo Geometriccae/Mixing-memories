@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
 import SectionHeading from "@/components/common/SectionHeading";
 import ProductCard from "@/components/common/ProductCard";
 import type { Product } from "@/data/mockData";
-import { fetchPublicProducts, mapApiProductToProduct } from "@/lib/catalogApi";
+import { fetchPublicProducts, fetchPublicProductsSearch, mapApiProductToProduct } from "@/lib/catalogApi";
 import goldenJaggeryWhite from "@/assets/royal-oven-golden-jaggery-white.png";
 
 function ProductGridSkeleton() {
@@ -26,6 +27,8 @@ function ProductGridSkeleton() {
 }
 
 const Products = () => {
+  const [searchParams] = useSearchParams();
+  const q = (searchParams.get("q") || "").trim();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +37,7 @@ const Products = () => {
     (async () => {
       setLoading(true);
       try {
-        const apiProducts = await fetchPublicProducts();
+        const apiProducts = q ? await fetchPublicProductsSearch(q, 200) : await fetchPublicProducts();
         if (cancelled) return;
         const mapped = apiProducts
           .map((p) => mapApiProductToProduct(p, goldenJaggeryWhite))
@@ -49,14 +52,17 @@ const Products = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [q]);
 
   return (
     <>
       <Navbar />
       <main className="min-h-screen">
         <SectionWrapper>
-          <SectionHeading title="Our Products" subtitle="Fresh & quality products for your everyday needs" />
+          <SectionHeading
+            title={q ? `Search: “${q}”` : "Our Products"}
+            subtitle={q ? "Products matching your search" : "Fresh & quality products for your everyday needs"}
+          />
           {loading ? (
             <ProductGridSkeleton />
           ) : (

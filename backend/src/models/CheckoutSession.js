@@ -8,7 +8,7 @@ const orderItemSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 1 },
     image: { type: String, default: "" },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const addressSchema = new mongoose.Schema(
@@ -22,27 +22,25 @@ const addressSchema = new mongoose.Schema(
     phone: { type: String, trim: true, default: "" },
     phoneAlt: { type: String, trim: true, default: "" },
   },
-  { _id: false }
+  { _id: false },
 );
 
-const orderSchema = new mongoose.Schema(
+/**
+ * Temporary checkout (stock reserved, Razorpay order created).
+ * No Order document until payment succeeds or definitively fails — dismiss = DELETE session + restock.
+ */
+const checkoutSessionSchema = new mongoose.Schema(
   {
-    /** Human-readable id for invoices (e.g. MM-20260410-ABC12X) */
-    orderNumber: { type: String, trim: true, unique: true, sparse: true, index: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     customerName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },
     phone: { type: String, default: "", trim: true },
-    /** Shipping address snapshot at order time */
     shippingAddress: { type: addressSchema, default: () => ({}) },
-    /** Legacy: cod, online — still allowed on old documents */
     paymentMethod: {
       type: String,
-      enum: ["cod", "upi", "online", "netbanking", "card"],
+      enum: ["upi", "netbanking", "card"],
       default: "upi",
     },
-    paymentStatus: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
-    razorpayOrderId: { type: String, default: "", trim: true },
     items: {
       type: [orderItemSchema],
       required: true,
@@ -52,17 +50,9 @@ const orderSchema = new mongoose.Schema(
       },
     },
     totalAmount: { type: Number, required: true, min: 0 },
-    status: {
-      type: String,
-      enum: ["placed", "shipped", "completed", "cancelled"],
-      default: "placed",
-    },
-    /** Set when status is cancelled: who initiated */
-    cancelledBy: { type: String, enum: ["user", "admin"], required: false },
-    /** Admin cancellation message shown to the customer (optional for user-initiated cancel) */
-    cancelReason: { type: String, default: "", trim: true, maxlength: 2000 },
+    razorpayOrderId: { type: String, default: "", trim: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model("Order", orderSchema);
+module.exports = mongoose.model("CheckoutSession", checkoutSessionSchema);

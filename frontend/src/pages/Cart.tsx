@@ -6,31 +6,19 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
 import SectionHeading from "@/components/common/SectionHeading";
-import { useCart, type CartLine } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchProductsAvailability, type ProductAvailability } from "@/lib/catalogApi";
-import { loadRazorpayScript } from "@/lib/razorpayCheckout";
-import { abandonUnpaidOrder, createOrder, type OrderDoc } from "@/lib/orderApi";
-import { payOrderWithRazorpay } from "@/lib/payOrderWithRazorpay";
+import { loadRazorpayScript, isRazorpayUserDismissed } from "@/lib/razorpayCheckout";
+import { abandonCheckoutSession, startCheckoutSession, type CheckoutSessionBundle } from "@/lib/orderApi";
+import { payCheckoutSessionWithRazorpay } from "@/lib/payOrderWithRazorpay";
 import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/PaymentMethodDialog";
-
-function orderItemsToCartLines(o: OrderDoc): CartLine[] {
-  return o.items
-    .filter((it) => it.productId)
-    .map((it) => ({
-      productId: String(it.productId),
-      name: it.name,
-      price: Number(it.price),
-      quantity: Math.max(1, Math.floor(Number(it.quantity))),
-      image: typeof it.image === "string" ? it.image : "",
-    }));
-}
 
 const Cart = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, token } = useAuth();
-  const { items, setQuantity, removeLine, clearCart, replaceCart, mergeLine, subtotal, itemCount } = useCart();
+  const { items, setQuantity, removeLine, clearCart, subtotal, itemCount } = useCart();
   const [availability, setAvailability] = useState<Record<string, ProductAvailability>>({});
   const [submitting, setSubmitting] = useState(false);
   const [orderingOne, setOrderingOne] = useState<string | null>(null);
@@ -58,17 +46,17 @@ const Cart = () => {
     };
   }, [items]);
 
-  useEffect(() => {
-    if (token && items.length > 0) {
-      void loadRazorpayScript().catch(() => {});
-    }
-  }, [token, items.length]);
-
   const addressOk = useMemo(() => {
     if (!user) return false;
     const a = user.address;
-    return Boolean(a.line1 && a.city && a.state && a.pincode);
+    return Boolean(a.line1 && a.city && a.state && a.pincode && a.phone);
   }, [user]);
+
+  useEffect(() => {
+    if (token && user && addressOk && items.length > 0) {
+      void loadRazorpayScript().catch(() => {});
+    }
+  }, [token, user, addressOk, items.length]);
 
   const placeOrderDisabled = submitting || items.length === 0 || !user;
 
@@ -84,6 +72,7 @@ const Cart = () => {
       return;
     }
     setOrderingOne(productId);
+    let checkout: CheckoutSessionBundle | null = null;
     try {
       const avail =
         availability[productId] != null ? availability : await fetchProductsAvailability([productId]);
@@ -96,51 +85,46 @@ const Cart = () => {
         throw new Error(`Not enough stock for "${line.name}". Only ${max} available.`);
       }
 
-      const order = await createOrder(token, {
-        items: [
-          {
-            productId: line.productId,
-            name: line.name,
-            price: line.price,
-            quantity: line.quantity,
-            image: line.image,
-          },
-        ],
-        paymentMethod: pm,
-      });
+      const [sessionOut] = await Promise.all([
+        startCheckoutSession(token, {
+          items: [
+            {
+              productId: line.productId,
+              name: line.name,
+              price: line.price,
+              quantity: line.quantity,
+              image: line.image,
+            },
+          ],
+          paymentMethod: pm,
+        }),
+        loadRazorpayScript().catch(() => {}),
+      ]);
+      checkout = sessionOut;
       if (!user) return;
+      await payCheckoutSessionWithRazorpay(token, sessionOut, pm, {
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+      });
       removeLine(productId);
-      try {
-        await payOrderWithRazorpay(token, order, pm, {
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-        });
-        toast.success("Order placed and paid successfully!");
-      } catch (payErr: unknown) {
-        const pmsg = payErr instanceof Error ? payErr.message : String(payErr);
-        if (pmsg === "Payment was cancelled.") {
-          try {
-            await abandonUnpaidOrder(token, order._id);
-            const lines = orderItemsToCartLines(order);
-            const line = lines[0];
-            if (line) mergeLine(line);
-            toast.info("Checkout cancelled. Your item is back in the cart.");
-          } catch (cancelErr: unknown) {
-            const cmsg = cancelErr instanceof Error ? cancelErr.message : String(cancelErr);
-            toast.error(cmsg || "Could not cancel checkout.");
-          }
-        } else {
-          toast.warning("Order saved — payment did not go through. Use Pay now on My Orders → Pending to try again.");
-          navigate("/orders/pending");
-        }
-      }
+      toast.success("Order placed and paid successfully!");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg === "Payment was cancelled.") {
-        toast.error("Payment cancelled.");
+      if (checkout && isRazorpayUserDismissed(err)) {
+        await abandonCheckoutSession(token, checkout.sessionId).catch(() => {});
+        toast.info("Checkout cancelled. Nothing was saved to your orders.");
+      } else if (
+        checkout &&
+        (msg === "Payment failed." || msg.includes("Payment verification failed"))
+      ) {
+        toast.warning("Payment did not complete. You can review or retry under My Orders → Pending.");
+        void navigate("/orders/pending");
+      } else if (checkout) {
+        await abandonCheckoutSession(token, checkout.sessionId).catch(() => {});
+        toast.error(msg || "Could not complete checkout.");
       } else {
-        toast.error(msg || "Failed to place order.");
+        toast.error(msg || "Failed to start checkout.");
       }
     } finally {
       setOrderingOne(null);
@@ -162,6 +146,7 @@ const Cart = () => {
       return;
     }
     setSubmitting(true);
+    let checkout: CheckoutSessionBundle | null = null;
     try {
       const ids = items.map((l) => l.productId).filter(Boolean);
       const haveAll = ids.length > 0 && ids.every((id) => availability[id] != null);
@@ -177,46 +162,43 @@ const Cart = () => {
         }
       }
 
-      const order = await createOrder(token, {
-        items: items.map((l) => ({
-          productId: l.productId,
-          name: l.name,
-          price: l.price,
-          quantity: l.quantity,
-          image: l.image,
-        })),
-        paymentMethod,
+      const [sessionOut] = await Promise.all([
+        startCheckoutSession(token, {
+          items: items.map((l) => ({
+            productId: l.productId,
+            name: l.name,
+            price: l.price,
+            quantity: l.quantity,
+            image: l.image,
+          })),
+          paymentMethod,
+        }),
+        loadRazorpayScript().catch(() => {}),
+      ]);
+      checkout = sessionOut;
+      await payCheckoutSessionWithRazorpay(token, sessionOut, paymentMethod, {
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
       });
       clearCart();
-      try {
-        await payOrderWithRazorpay(token, order, paymentMethod, {
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-        });
-        toast.success("Order placed and paid successfully!");
-      } catch (payErr: unknown) {
-        const pmsg = payErr instanceof Error ? payErr.message : String(payErr);
-        if (pmsg === "Payment was cancelled.") {
-          try {
-            await abandonUnpaidOrder(token, order._id);
-            replaceCart(orderItemsToCartLines(order));
-            toast.info("Checkout cancelled. Your cart was restored.");
-          } catch (cancelErr: unknown) {
-            const cmsg = cancelErr instanceof Error ? cancelErr.message : String(cancelErr);
-            toast.error(cmsg || "Could not cancel checkout.");
-          }
-        } else {
-          toast.warning("Order saved — payment did not go through. Use Pay now on My Orders → Pending to try again.");
-          navigate("/orders/pending");
-        }
-      }
+      toast.success("Order placed and paid successfully!");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg === "Payment was cancelled.") {
-        toast.error("Payment cancelled.");
+      if (checkout && isRazorpayUserDismissed(err)) {
+        await abandonCheckoutSession(token, checkout.sessionId).catch(() => {});
+        toast.info("Checkout cancelled. Nothing was saved to your orders.");
+      } else if (
+        checkout &&
+        (msg === "Payment failed." || msg.includes("Payment verification failed"))
+      ) {
+        toast.warning("Payment did not complete. You can review or retry under My Orders → Pending.");
+        void navigate("/orders/pending");
+      } else if (checkout) {
+        await abandonCheckoutSession(token, checkout.sessionId).catch(() => {});
+        toast.error(msg || "Could not complete checkout.");
       } else {
-        toast.error(msg || "Failed to place order.");
+        toast.error(msg || "Failed to start checkout.");
       }
     } finally {
       setSubmitting(false);
@@ -366,15 +348,18 @@ const Cart = () => {
                             {
                               id: "upi" as const,
                               label: "UPI",
-                              hint: "Phone browser: GPay/PhonePe · PC: QR or UPI ID (test QR often invalid in real apps — use success@razorpay or pay on phone)",
+                              hint: "Google Pay, PhonePe, or any UPI app",
                             },
-                            { id: "netbanking" as const, label: "Net banking", hint: "Bank transfer" },
-                            { id: "card" as const, label: "Card", hint: "Debit / credit" },
+                            { id: "netbanking" as const, label: "Net banking", hint: "Pay from your bank account" },
+                            { id: "card" as const, label: "Card", hint: "Debit or credit card" },
                           ].map((m) => (
                             <button
                               key={m.id}
                               type="button"
-                              onClick={() => setPaymentMethod(m.id)}
+                              onClick={() => {
+                                setPaymentMethod(m.id);
+                                void loadRazorpayScript().catch(() => {});
+                              }}
                               className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                                 paymentMethod === m.id ? "border-primary bg-primary/5 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted/50"
                               }`}
@@ -389,6 +374,8 @@ const Cart = () => {
                       <button
                         type="submit"
                         disabled={placeOrderDisabled}
+                        onMouseEnter={() => void loadRazorpayScript().catch(() => {})}
+                        onFocus={() => void loadRazorpayScript().catch(() => {})}
                         className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
                       >
                         {submitting ? "Placing order…" : "Place order"}
@@ -410,6 +397,7 @@ const Cart = () => {
             navigate("/auth", { state: { from: location.pathname } });
             return;
           }
+          if (o) void loadRazorpayScript().catch(() => {});
           setPmOpen(o);
           if (!o) setPmForProductId(null);
         }}

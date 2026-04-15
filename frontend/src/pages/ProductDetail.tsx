@@ -12,10 +12,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchPublicProductById, mapApiProductToProduct } from "@/lib/catalogApi";
 import { discountPercentOff } from "@/lib/productPricing";
 import { takeCachedProductDoc } from "@/lib/productDetailPrefetch";
-import { loadRazorpayScript } from "@/lib/razorpayCheckout";
+import { loadRazorpayScript, isRazorpayUserDismissed } from "@/lib/razorpayCheckout";
 import goldenJaggeryWhite from "@/assets/royal-oven-golden-jaggery-white.png";
-import { createOrder } from "@/lib/orderApi";
-import { payOrderWithRazorpay } from "@/lib/payOrderWithRazorpay";
+import { abandonCheckoutSession, startCheckoutSession, type CheckoutSessionBundle } from "@/lib/orderApi";
+import { payCheckoutSessionWithRazorpay } from "@/lib/payOrderWithRazorpay";
 import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/PaymentMethodDialog";
 
 function ProductDetailSkeleton() {
@@ -67,8 +67,14 @@ const ProductDetail = () => {
   const addressOk = useMemo(() => {
     if (!user) return false;
     const a = user.address;
-    return Boolean(a.line1 && a.city && a.state && a.pincode);
+    return Boolean(a.line1 && a.city && a.state && a.pincode && a.phone);
   }, [user]);
+
+  /** Opening detail from footer/marquee leaves scroll position mid-page — jump to top for each product. */
+  useEffect(() => {
+    if (!productId) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [productId]);
 
   useEffect(() => {
     if (user && token) {
@@ -159,20 +165,25 @@ const ProductDetail = () => {
       return;
     }
     setOrderingNow(true);
+    let checkout: CheckoutSessionBundle | null = null;
     try {
-      const order = await createOrder(token, {
-        items: [
-          {
-            productId: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: 1,
-            image: product.image,
-          },
-        ],
-        paymentMethod,
-      });
-      await payOrderWithRazorpay(token, order, paymentMethod, {
+      const [sessionOut] = await Promise.all([
+        startCheckoutSession(token, {
+          items: [
+            {
+              productId: product.id,
+              name: product.name,
+              price: product.price,
+              quantity: 1,
+              image: product.image,
+            },
+          ],
+          paymentMethod,
+        }),
+        loadRazorpayScript().catch(() => {}),
+      ]);
+      checkout = sessionOut;
+      await payCheckoutSessionWithRazorpay(token, sessionOut, paymentMethod, {
         name: user.name,
         email: user.email,
         phone: user.phone,
@@ -181,10 +192,20 @@ const ProductDetail = () => {
       setPmOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg === "Payment was cancelled.") {
-        toast.error("Payment cancelled. An unpaid order may exist — check My Orders before trying again.");
+      if (checkout && isRazorpayUserDismissed(err)) {
+        await abandonCheckoutSession(token, checkout.sessionId).catch(() => {});
+        toast.info("Checkout cancelled. Nothing was saved to your orders.");
+      } else if (
+        checkout &&
+        (msg === "Payment failed." || msg.includes("Payment verification failed"))
+      ) {
+        toast.warning("Payment did not complete. You can review or retry under My Orders → Pending.");
+        void navigate("/orders/pending");
+      } else if (checkout) {
+        await abandonCheckoutSession(token, checkout.sessionId).catch(() => {});
+        toast.error(msg || "Could not complete checkout.");
       } else {
-        toast.error(msg || "Failed to place order.");
+        toast.error(msg || "Failed to start checkout.");
       }
     } finally {
       setOrderingNow(false);
@@ -362,6 +383,7 @@ const ProductDetail = () => {
                         toast.error("Please fill your delivery address in Profile before ordering.");
                         return;
                       }
+                      void loadRazorpayScript().catch(() => {});
                       setPmOpen(true);
                     }}
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background text-foreground font-medium px-6 py-3 hover:bg-muted/50 transition-colors w-full sm:w-auto sm:min-w-[180px] disabled:opacity-50 disabled:pointer-events-none"

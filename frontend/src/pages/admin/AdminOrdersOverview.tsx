@@ -120,9 +120,9 @@ const AdminOrdersOverview = () => {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <StatCard title="Orders in range" value={String(stats.totalOrders)} icon={ShoppingCart} />
-            <StatCard title="Paid revenue (range)" value={formatInr(stats.revenuePaid)} icon={IndianRupee} />
-            <StatCard title="Unpaid / pending (range)" value={formatInr(stats.revenuePending)} icon={Package} />
-            <StatCard title="Customers (all)" value={customerCount != null ? String(customerCount) : "—"} icon={User} />
+            <StatCard title="Paid revenue" value={formatInr(stats.revenuePaid)} icon={IndianRupee} />
+            <StatCard title="Unpaid / pending" value={formatInr(stats.revenuePending)} icon={Package} />
+            <StatCard title="Customers" value={customerCount != null ? String(customerCount) : "—"} icon={User} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">

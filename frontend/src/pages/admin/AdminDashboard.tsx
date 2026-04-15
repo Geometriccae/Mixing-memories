@@ -156,15 +156,15 @@ const AdminDashboard = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <StatCard title="Orders (filtered)" value={String(stats.totalOrders)} icon={ShoppingCart} />
-            <StatCard title="Paid revenue (filtered)" value={formatInr(stats.revenuePaid)} icon={IndianRupee} />
-            <StatCard title="Unpaid / pending (filtered)" value={formatInr(stats.revenuePending)} icon={Package} />
-            <StatCard title="Customers (all)" value={customerCount != null ? String(customerCount) : "—"} icon={User} />
+            <StatCard title="Orders" value={String(stats.totalOrders)} icon={ShoppingCart} />
+            <StatCard title="Paid revenue" value={formatInr(stats.revenuePaid)} icon={IndianRupee} />
+            <StatCard title="Unpaid / pending" value={formatInr(stats.revenuePending)} icon={Package} />
+            <StatCard title="Customers" value={customerCount != null ? String(customerCount) : "—"} icon={User} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <StatCard title="Avg. paid order (filtered)" value={avgPaid} icon={TrendingUp} />
-            <StatCard title="Paid orders (filtered)" value={String(stats.paidOrderCount)} icon={ShoppingCart} />
+            <StatCard title="Avg. paid order" value={avgPaid} icon={TrendingUp} />
+            <StatCard title="Paid orders" value={String(stats.paidOrderCount)} icon={ShoppingCart} />
             <StatCard
               title="This month — paid ₹"
               value={loadingMonths ? "…" : formatInr(snapThis.revenuePaid)}
@@ -191,14 +191,14 @@ const AdminDashboard = () => {
             <div className={`${cardBase} min-h-[320px]`}>
               <OrderStatusDonut
                 data={stats.pieData}
-                title="Status mix (filtered)"
+                title="Status mix"
                 subtitle="Share by fulfilment status"
               />
             </div>
             <div className={`${cardBase} min-h-[320px]`}>
               <OrdersTrendBarChart
                 data={barData}
-                title="Volume trend (filtered)"
+                title="Volume trend"
                 subtitle={
                   applied.allTime
                     ? "Grouped by week when the range has many days"

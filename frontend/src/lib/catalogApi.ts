@@ -48,6 +48,18 @@ export async function fetchPublicProducts(limit: number = DEFAULT_PRODUCT_LIST_L
   return parseJsonData<ApiProductDoc>(json);
 }
 
+/** Name search (same `search` query as admin listing). */
+export async function fetchPublicProductsSearch(search: string, limit: number = 20): Promise<ApiProductDoc[]> {
+  const q = search.trim();
+  if (!q) return fetchPublicProducts(limit);
+  const n = Math.min(100, Math.max(1, Math.floor(limit)));
+  const params = new URLSearchParams({ page: "1", limit: String(n), search: q });
+  const res = await fetch(`${apiBaseUrl()}/api/products?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to search products");
+  const json: unknown = await res.json();
+  return parseJsonData<ApiProductDoc>(json);
+}
+
 export async function fetchPublicProductById(id: string): Promise<ApiProductDoc | null> {
   const trimmed = id.trim();
   if (!trimmed) return null;
