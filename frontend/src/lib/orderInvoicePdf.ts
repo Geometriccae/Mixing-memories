@@ -54,6 +54,10 @@ function formatAddress(o: OrderDoc): string {
   const parts = [a.line1, a.line2, a.city, a.state, a.pincode, a.country]
     .map((s) => String(s || "").trim())
     .filter(Boolean);
+  const p = String(a.phone || "").trim();
+  const p2 = String(a.phoneAlt || "").trim();
+  if (p) parts.push(`Mob: ${p}`);
+  if (p2) parts.push(`Alt: ${p2}`);
   return parts.length ? parts.join(", ") : "—";
 }
 

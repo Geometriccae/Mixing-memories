@@ -1,15 +1,22 @@
+import { Building2, CreditCard, Smartphone } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export type PaymentMethod = "upi" | "netbanking" | "card";
 
-const METHODS: { id: PaymentMethod; label: string; hint: string }[] = [
+const METHODS: {
+  id: PaymentMethod;
+  label: string;
+  hint: string;
+  Icon: typeof Smartphone;
+}[] = [
   {
     id: "upi",
     label: "UPI",
-    hint: "Best on your phone’s browser (opens GPay/PhonePe). On a PC, Razorpay may show a QR or a UPI ID box.",
+    hint: "Google Pay, PhonePe, or any UPI app",
+    Icon: Smartphone,
   },
-  { id: "netbanking", label: "Net banking", hint: "Pay from your bank" },
-  { id: "card", label: "Card", hint: "Debit or credit card" },
+  { id: "netbanking", label: "Net banking", hint: "Pay from your bank account", Icon: Building2 },
+  { id: "card", label: "Card", hint: "Debit or credit card", Icon: CreditCard },
 ];
 
 type Props = {
@@ -40,24 +47,38 @@ const PaymentMethodDialog = ({
           <div>
             <p className="text-base font-semibold text-foreground">{title}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Razorpay opens the actual payment screen. Which options you see depends on test vs live mode and your device.
+              Razorpay opens the secure payment window. Available options depend on your device and Razorpay mode.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            {METHODS.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => onChange(m.id)}
-                className={`rounded-xl border px-4 py-3 text-left transition-colors ${
-                  value === m.id ? "border-primary bg-primary/5 text-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted/50"
-                }`}
-              >
-                <span className="block text-sm font-medium text-foreground">{m.label}</span>
-                <span className="block text-xs text-muted-foreground mt-0.5">{m.hint}</span>
-              </button>
-            ))}
+            {METHODS.map((m) => {
+              const Icon = m.Icon;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onChange(m.id)}
+                  className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                    value === m.id
+                      ? "border-primary bg-primary/5 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${
+                      value === m.id ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted/50 text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">{m.label}</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">{m.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {value === "card" ? (

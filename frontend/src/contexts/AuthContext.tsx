@@ -17,6 +17,28 @@ import {
 } from "@/lib/authApi";
 
 const TOKEN_KEY = "royal_oven_user_token";
+/** Cached profile for the current token — used when /me fails transiently so closing the browser does not force login. */
+const USER_CACHE_KEY = "royal_oven_user_public_json";
+
+function readCachedUser(): import("@/lib/authApi").UserPublic | null {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    if (!raw) return null;
+    const u = JSON.parse(raw) as import("@/lib/authApi").UserPublic;
+    return u?.id ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(u: import("@/lib/authApi").UserPublic | null) {
+  try {
+    if (!u?.id) localStorage.removeItem(USER_CACHE_KEY);
+    else localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u));
+  } catch {
+    /* quota */
+  }
+}
 
 type AuthContextValue = {
   user: UserPublic | null;
@@ -42,14 +64,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setToken(stored);
-    fetchMe(stored)
-      .then(setUser)
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
-      })
-      .finally(() => setIsLoading(false));
+    const cached = readCachedUser();
+    if (cached) setUser(cached);
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    void (async () => {
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const u = await fetchMe(stored);
+          setUser(u);
+          writeCachedUser(u);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          lastErr = e;
+          const msg = e instanceof Error ? e.message : "";
+          if (msg === "AUTH_UNAUTHORIZED") {
+            localStorage.removeItem(TOKEN_KEY);
+            writeCachedUser(null);
+            setToken(null);
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+          if (attempt < 2) await sleep(400 * (attempt + 1));
+        }
+      }
+      void lastErr;
+      if (cached) {
+        setToken(stored);
+        setUser(cached);
+        setIsLoading(false);
+        return;
+      }
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+      setIsLoading(false);
+    })();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -57,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOKEN_KEY, t);
     setToken(t);
     setUser(u);
+    writeCachedUser(u);
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
@@ -64,10 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOKEN_KEY, t);
     setToken(t);
     setUser(u);
+    writeCachedUser(u);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
+    writeCachedUser(null);
     setToken(null);
     setUser(null);
   }, []);
@@ -77,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!token) throw new Error("Not signed in.");
       const next = await updateProfileRequest(token, body);
       setUser(next);
+      writeCachedUser(next);
     },
     [token]
   );

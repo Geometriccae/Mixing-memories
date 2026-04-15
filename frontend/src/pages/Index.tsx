@@ -9,7 +9,7 @@ import ContactSection from "@/components/home/ContactSection";
 const Index = () => (
   <>
     <Navbar />
-    <main>
+    <main className="flex min-h-screen flex-col">
       <HeroSection />
       <FeaturedProducts />
       <AboutSection />

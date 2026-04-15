@@ -5,6 +5,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { bustDetailJsonCache } = require("../utils/productDetailJsonCache");
 const { withMongoOpRetry } = require("../utils/mongoReadRetry");
+const { getActiveShippingFromUser } = require("../utils/userShippingAddress");
 
 const ALLOWED_STATUSES = ["placed", "shipped", "completed", "cancelled"];
 const ALLOWED_PAYMENT_METHODS = ["upi", "netbanking", "card"];
@@ -51,6 +52,8 @@ function normalizeShippingAddress(addr) {
     state: a.state != null ? String(a.state).trim() : "",
     pincode: a.pincode != null ? String(a.pincode).trim() : "",
     country: a.country != null ? String(a.country).trim() : "India",
+    phone: a.phone != null ? String(a.phone).trim() : "",
+    phoneAlt: a.phoneAlt != null ? String(a.phoneAlt).trim() : "",
   };
   return out;
 }
@@ -100,11 +103,14 @@ const createOrder = asyncHandler(async (req, res) => {
   if (!snapName || !snapEmail) throw new ApiError(400, "Please complete your profile (name + email).");
 
   const addrBody = normalizeShippingAddress(req.body && req.body.shippingAddress);
-  const addrProfile = normalizeShippingAddress(u.address);
+  const addrProfile = normalizeShippingAddress(getActiveShippingFromUser(u));
   const shippingAddress = isAddressFilled(addrBody) ? addrBody : addrProfile;
   if (!isAddressFilled(shippingAddress)) {
     throw new ApiError(400, "Please fill your delivery address in Profile before placing an order.");
   }
+
+  const shipPhone = shippingAddress.phone != null ? String(shippingAddress.phone).trim() : "";
+  const orderPhone = shipPhone || snapPhone;
 
   const decremented = [];
 
@@ -132,7 +138,7 @@ const createOrder = asyncHandler(async (req, res) => {
         userId: u._id,
         customerName: snapName,
         email: snapEmail,
-        phone: snapPhone,
+        phone: orderPhone,
         shippingAddress,
         paymentMethod: pm,
         paymentStatus: "pending",

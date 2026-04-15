@@ -1,15 +1,18 @@
 import type { PaymentMethod } from "@/components/checkout/PaymentMethodDialog";
-import { verifyRazorpayPayment, type RazorpayCheckoutBundle } from "@/lib/orderApi";
+import {
+  verifyRazorpayPayment,
+  verifyCheckoutSessionPayment,
+  markCheckoutSessionPaymentFailed,
+  type RazorpayCheckoutBundle,
+} from "@/lib/orderApi";
 
 type Prefill = { name?: string; email?: string; phone?: string };
 
-/**
- * Narrow checkout to the method the user already picked in our UI.
- *
- * Do **not** use a custom `blocks` + `show_default_blocks: false` with only `{ method: "upi" }` — that
- * drops Razorpay’s default UPI instruments (QR / routing) and triggers “No appropriate payment method found.”
- * Hiding other methods keeps the default UPI block intact.
- */
+export function isRazorpayUserDismissed(err: unknown): boolean {
+  const m = (err instanceof Error ? err.message : String(err)).trim();
+  return m === "Payment was cancelled.";
+}
+
 function checkoutConfigHideExcept(chosen: PaymentMethod): Record<string, unknown> {
   const hide: { method: string }[] = [];
   if (chosen !== "upi") hide.push({ method: "upi" });
@@ -19,7 +22,6 @@ function checkoutConfigHideExcept(chosen: PaymentMethod): Record<string, unknown
   return { display: { hide } };
 }
 
-/** UPI Intent (in-browser app list) is for mobile; forcing it on desktop can leave Razorpay’s modal blank — use default QR flow on PC. */
 function isLikelyMobileBrowser(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -38,15 +40,12 @@ function normalizeIndianContact(raw?: string): string {
   return s;
 }
 
-/** Razorpay UPI routing often expects both `contact` and `email`; phone-only accounts get a disposable address. */
 function effectiveCheckoutPrefill(prefill?: Prefill) {
   const contact = normalizeIndianContact(prefill?.phone);
   const emailRaw = String(prefill?.email ?? "").trim();
   const email =
     emailRaw ||
-    (contact
-      ? `checkout${contact.replace(/\D/g, "").slice(-10)}@noreply.royaloven.invalid`
-      : "");
+    (contact ? `checkout${contact.replace(/\D/g, "").slice(-10)}@noreply.royaloven.invalid` : "");
   return {
     name: String(prefill?.name ?? "").trim(),
     email,
@@ -79,20 +78,45 @@ type RazorpayHandlerResponse = {
   razorpay_signature: string;
 };
 
+export type VerifyTarget =
+  | { type: "order"; orderMongoId: string }
+  | { type: "checkoutSession"; sessionId: string };
+
 export type OpenRazorpayOpts = {
   bundle: RazorpayCheckoutBundle;
   token: string;
-  orderMongoId: string;
+  verifyTarget: VerifyTarget;
   paymentMethod: PaymentMethod;
   prefill?: Prefill;
 };
 
+async function runVerify(
+  token: string,
+  target: VerifyTarget,
+  razorpay_order_id: string,
+  razorpay_payment_id: string,
+  razorpay_signature: string,
+) {
+  if (target.type === "order") {
+    await verifyRazorpayPayment(token, target.orderMongoId, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+  } else {
+    await verifyCheckoutSessionPayment(
+      token,
+      target.sessionId,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    );
+  }
+}
+
 /**
- * Opens Razorpay Standard Checkout with only the selected method enabled
- * (UPI shows in-app options like Google Pay / PhonePe when the customer pays on mobile / supported browsers).
+ * Opens Razorpay Standard Checkout with only the selected method enabled.
+ * Use `verifyTarget` for either an existing unpaid order or a checkout session (cart / product page).
  */
 export function openRazorpayCheckout(opts: OpenRazorpayOpts): Promise<void> {
-  const { bundle, token, orderMongoId, paymentMethod, prefill } = opts;
+  const { bundle, token, paymentMethod, prefill, verifyTarget } = opts;
+
   return loadRazorpayScript().then(
     () =>
       new Promise((resolve, reject) => {
@@ -101,17 +125,11 @@ export function openRazorpayCheckout(opts: OpenRazorpayOpts): Promise<void> {
           reject(new Error("Razorpay failed to load."));
           return;
         }
-        let paymentHandled = false;
+        let terminal = false;
         const prefillPayload = effectiveCheckoutPrefill(prefill);
         const mobile = isLikelyMobileBrowser();
         const desktopUpi = paymentMethod === "upi" && !mobile;
 
-        /**
-         * Desktop UPI: boolean `method` map only — no `config.display.hide` (breaks QR/instruments).
-         * Card: same idea — `display.hide` can collapse the card rail to a single saved token with no
-         * “new card” / switch path; boolean map keeps the full card experience.
-         * Mobile UPI / netbanking: `hide` + optional string `method` for routing.
-         */
         const methodRestriction = {
           upi: paymentMethod === "upi",
           card: paymentMethod === "card",
@@ -138,16 +156,11 @@ export function openRazorpayCheckout(opts: OpenRazorpayOpts): Promise<void> {
           prefill: prefillPayload,
           theme: { color: "#000533" },
           handler: (response: RazorpayHandlerResponse) => {
-            paymentHandled = true;
+            if (terminal) return;
+            terminal = true;
             void (async () => {
               try {
-                await verifyRazorpayPayment(
-                  token,
-                  orderMongoId,
-                  response.razorpay_order_id,
-                  response.razorpay_payment_id,
-                  response.razorpay_signature,
-                );
+                await runVerify(token, verifyTarget, response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
                 resolve();
               } catch (e) {
                 reject(e instanceof Error ? e : new Error(String(e)));
@@ -157,14 +170,31 @@ export function openRazorpayCheckout(opts: OpenRazorpayOpts): Promise<void> {
           modal: {
             ondismiss: () => {
               queueMicrotask(() => {
-                if (!paymentHandled) {
-                  reject(new Error("Payment was cancelled."));
-                }
+                if (terminal) return;
+                terminal = true;
+                reject(new Error("Payment was cancelled."));
               });
             },
           },
         };
         const rzp = new Ctor(options);
+        rzp.on("payment.failed", () => {
+          queueMicrotask(() => {
+            if (terminal) return;
+            terminal = true;
+            void (async () => {
+              try {
+                if (verifyTarget.type === "checkoutSession") {
+                  await markCheckoutSessionPaymentFailed(token, verifyTarget.sessionId);
+                }
+              } catch {
+                /* still surface payment failed to caller */
+              } finally {
+                reject(new Error("Payment failed."));
+              }
+            })();
+          });
+        });
         rzp.open();
       }),
   );

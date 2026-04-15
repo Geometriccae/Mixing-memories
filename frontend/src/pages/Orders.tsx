@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { FileDown } from "lucide-react";
+import { CircleCheck, Clock, FileDown, Loader2 } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
 import SectionHeading from "@/components/common/SectionHeading";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
-import { cancelMyOrder, fetchMyOrders, type OrderDoc } from "@/lib/orderApi";
+import { abandonUnpaidOrder, cancelMyOrder, fetchMyOrders, type OrderDoc } from "@/lib/orderApi";
 import { payOrderWithRazorpay } from "@/lib/payOrderWithRazorpay";
 import { loadRazorpayScript } from "@/lib/razorpayCheckout";
 import PaymentMethodDialog, { type PaymentMethod } from "@/components/checkout/PaymentMethodDialog";
@@ -79,20 +79,22 @@ const Orders = () => {
   useEffect(() => {
     if (!token) return;
     void loadMyOrders();
-  }, [token]);
+  }, [token, pathname]);
 
   const paymentView: "paid" | "unpaid" = pathname.includes("/success") ? "paid" : "unpaid";
 
   const filteredOrders = useMemo(() => {
     return myOrders.filter((o) => {
       const ps = String(o.paymentStatus || "").toLowerCase();
+      const st = String(o.status || "").toLowerCase();
       if (paymentView === "paid") return ps === "paid";
-      return ps !== "paid";
+      return ps !== "paid" && st !== "cancelled";
     });
   }, [myOrders, paymentView]);
 
   const openPayDialog = (o: OrderDoc) => {
     if (!token || !user) return;
+    void loadRazorpayScript().catch(() => {});
     setPayDialogOrder(o);
     setPayDialogMethod(orderPaymentMethod(o));
     setPayDialogOpen(true);
@@ -103,7 +105,6 @@ const Orders = () => {
     void (async () => {
       setPayingOrderId(o._id);
       try {
-        await loadRazorpayScript();
         await payOrderWithRazorpay(token, o, pm, {
           name: user.name,
           email: user.email,
@@ -114,7 +115,13 @@ const Orders = () => {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === "Payment was cancelled.") {
-          toast.error("Payment cancelled.");
+          try {
+            await abandonUnpaidOrder(token, o._id);
+            toast.error("Payment cancelled — order was not placed.");
+          } catch {
+            toast.error("Payment cancelled.");
+          }
+          await loadMyOrders();
         } else {
           toast.error(msg || "Payment failed.");
         }
@@ -165,7 +172,7 @@ const Orders = () => {
             subtitle={
               paymentView === "paid"
                 ? "Orders with successful payment — download invoices here."
-                : "Orders that still need payment — your order is saved; complete Razorpay checkout with Pay now."
+                : "Orders that still need payment (or failed online) — use Pay now for Razorpay. When payment is confirmed (Razorpay or manually by the store), the order moves to the Successful tab."
             }
           />
 
@@ -204,7 +211,10 @@ const Orders = () => {
             </div>
 
             {loadingOrders ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
+              <div className="rounded-xl border border-border bg-card p-10 flex flex-col items-center justify-center gap-3">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">Loading orders...</p>
+              </div>
             ) : myOrders.length === 0 ? (
               <div className="rounded-xl border border-border bg-card p-8 text-center">
                 <p className="text-foreground font-medium">No orders yet</p>
@@ -213,31 +223,18 @@ const Orders = () => {
                 </p>
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="rounded-xl border border-border bg-card p-8 text-center">
-                <p className="text-foreground font-medium">
-                  {paymentView === "paid" ? "No successful payments yet" : "No pending payments"}
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {paymentView === "paid" ? (
-                    <>
-                      Paid orders will appear here after Razorpay confirms payment.{" "}
-                      <Link to="/orders/pending" className="text-primary font-medium hover:underline">
-                        View pending
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Link to="/orders/success" className="text-primary font-medium hover:underline">
-                        View successful orders
-                      </Link>{" "}
-                      or place a new order from your{" "}
-                      <Link to="/cart" className="text-primary font-medium hover:underline">
-                        cart
-                      </Link>
-                      .
-                    </>
-                  )}
-                </p>
+              <div className="rounded-xl border border-border bg-card p-10 text-center">
+                {paymentView === "paid" ? (
+                  <>
+                    <CircleCheck className="mx-auto h-12 w-12 text-muted-foreground/55" aria-hidden />
+                    <p className="mt-3 font-medium text-foreground">No successful orders yet</p>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="mx-auto h-12 w-12 text-muted-foreground/55" aria-hidden />
+                    <p className="mt-3 font-medium text-foreground">No pending orders</p>
+                  </>
+                )}
               </div>
             ) : (
               <ul className="space-y-4">

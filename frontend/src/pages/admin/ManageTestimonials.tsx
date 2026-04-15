@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -12,22 +12,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { createTestimonial, deleteTestimonial, fetchTestimonials, type TestimonialDoc } from "@/lib/testimonialsApi";
+import { approveTestimonial, deleteTestimonial, fetchAllTestimonials, type TestimonialDoc } from "@/lib/testimonialsApi";
 
 const ManageTestimonials = () => {
   const token = useMemo(() => sessionStorage.getItem("admin_token"), []);
   const [items, setItems] = useState<TestimonialDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", text: "" });
   const [deleteTarget, setDeleteTarget] = useState<TestimonialDoc | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const list = await fetchTestimonials();
+      const list = await fetchAllTestimonials(token);
       setItems(list);
     } catch {
       toast.error("Could not load testimonials.");
@@ -41,25 +40,17 @@ const ManageTestimonials = () => {
     void load();
   }, [load]);
 
-  const handleAdd = async () => {
-    if (!token) {
-      toast.error("Please log in to the admin panel.");
-      return;
-    }
-    if (!form.name.trim() || !form.text.trim()) {
-      toast.error("Fill all fields");
-      return;
-    }
-    setSaving(true);
+  const handleApprove = async (t: TestimonialDoc) => {
+    if (!token) return;
+    setApprovingId(t._id);
     try {
-      const doc = await createTestimonial(token, { name: form.name.trim(), text: form.text.trim() });
-      setItems((prev) => [...prev, doc]);
-      setForm({ name: "", text: "" });
-      toast.success("Testimonial added");
+      const updated = await approveTestimonial(token, t._id);
+      setItems((prev) => prev.map((x) => (x._id === updated._id ? updated : x)));
+      toast.success("Review approved — visible on the site.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to add.");
+      toast.error(e instanceof Error ? e.message : "Failed to approve.");
     } finally {
-      setSaving(false);
+      setApprovingId(null);
     }
   };
 
@@ -82,67 +73,80 @@ const ManageTestimonials = () => {
     return <p className="text-sm text-muted-foreground">Admin session missing. Please log in.</p>;
   }
 
+  const pending = items.filter((x) => x.status === "pending");
+
   return (
     <div className="space-y-6">
       <h2 className="font-display text-xl font-semibold text-foreground">Manage Testimonials</h2>
-      <div className="bg-card rounded-2xl p-6 card-shadow space-y-4">
-        <input
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="Customer name"
-          className="w-full px-4 py-3 rounded-xl bg-muted border border-border text-foreground outline-none focus:ring-2 focus:ring-primary/30 text-sm"
-        />
-        <textarea
-          value={form.text}
-          onChange={(e) => setForm({ ...form, text: e.target.value })}
-          placeholder="Review text"
-          rows={3}
-          className="w-full px-4 py-3 rounded-xl bg-muted border border-border text-foreground outline-none focus:ring-2 focus:ring-primary/30 text-sm resize-none"
-        />
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void handleAdd()}
-          className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Adding…" : "Add Testimonial"}
-        </button>
-      </div>
+      <p className="text-sm text-muted-foreground -mt-2">
+        Reviews are submitted by customers on the site. Approve pending entries to show them on the home page, or delete
+        as needed.
+      </p>
+
+      {pending.length > 0 ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+          <p className="text-sm font-semibold text-foreground">Pending customer reviews ({pending.length})</p>
+          <p className="text-xs text-muted-foreground">Approve to show them on the home page.</p>
+        </div>
+      ) : null}
+
       <div className="bg-card rounded-2xl card-shadow divide-y divide-border">
         {loading ? (
           <p className="px-6 py-8 text-sm text-muted-foreground">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="px-6 py-8 text-sm text-muted-foreground">No testimonials yet. Add one above.</p>
+          <p className="px-6 py-8 text-sm text-muted-foreground">No testimonials yet. Customer reviews will appear here when submitted.</p>
         ) : (
           items.map((t) => (
             <div key={t._id} className="flex items-start justify-between px-6 py-4 gap-4">
-              <div className="flex gap-3 items-start">
+              <div className="flex gap-3 items-start min-w-0">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
                   {t.avatar || "?"}
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">{t.name}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{t.text}</p>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-foreground">{t.name}</p>
+                    {t.status === "pending" ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-200">
+                        Pending
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                        Approved
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1 break-words">{t.text}</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(t)}
-                className="p-2 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive shrink-0"
-                aria-label="Delete testimonial"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {t.status === "pending" ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleApprove(t)}
+                    disabled={approvingId === t._id}
+                    className="p-2 hover:bg-primary/10 rounded-lg text-primary"
+                    aria-label="Approve review"
+                    title="Approve"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(t)}
+                  className="p-2 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive shrink-0"
+                  aria-label="Delete testimonial"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
-        <AlertDialogContent
-          onPointerDownOutside={(e) => deleting && e.preventDefault()}
-          onEscapeKeyDown={(e) => deleting && e.preventDefault()}
-        >
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete testimonial?</AlertDialogTitle>
             <AlertDialogDescription>

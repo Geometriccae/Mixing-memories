@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { fetchAdminOrders, patchOrderPaymentStatus, type OrderDoc } from "@/lib/orderApi";
 import { orderDisplayId, paymentStatusLabel } from "@/lib/orderInvoicePdf";
 
@@ -24,6 +35,7 @@ const ManageTransactions = () => {
   const [orders, setOrders] = useState<OrderDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [markPaidTarget, setMarkPaidTarget] = useState<OrderDoc | null>(null);
 
   const refresh = async () => {
     if (!token) {
@@ -49,13 +61,15 @@ const ManageTransactions = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, token, paymentFilter]);
 
-  const markPaid = (orderId: string) => {
-    if (!token) return;
+  const confirmMarkPaid = () => {
+    if (!token || !markPaidTarget) return;
+    const orderId = markPaidTarget._id;
     void (async () => {
       setUpdatingId(orderId);
       try {
         await patchOrderPaymentStatus(token, orderId, "paid");
-        toast.success("Payment marked successful");
+        toast.success("Payment marked as paid.");
+        setMarkPaidTarget(null);
         await refresh();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -146,10 +160,10 @@ const ManageTransactions = () => {
                         <button
                           type="button"
                           disabled={updatingId === o._id || String(o.status).toLowerCase() === "cancelled"}
-                          onClick={() => markPaid(o._id)}
+                          onClick={() => setMarkPaidTarget(o)}
                           className="rounded-lg bg-primary text-primary-foreground text-xs font-semibold px-3 py-1.5 hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
                         >
-                          {updatingId === o._id ? "Saving…" : "Mark successful"}
+                          Mark successful
                         </button>
                       </td>
                     ) : null}
@@ -160,6 +174,50 @@ const ManageTransactions = () => {
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={markPaidTarget !== null}
+        onOpenChange={(open) => !open && updatingId === null && setMarkPaidTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Payment received?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-left">
+              <span className="block text-sm text-muted-foreground">
+                Only confirm if you have actually received this customer&apos;s payment (UPI, bank transfer, cash,
+                etc.). The order will move to <strong className="text-foreground">paid</strong> on their account and
+                appear under <strong className="text-foreground">My orders → Successful</strong>, not under Pending.
+              </span>
+              {markPaidTarget ? (
+                <ul className="list-none space-y-1 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+                  <li>
+                    <span className="text-muted-foreground">Order: </span>
+                    {orderDisplayId(markPaidTarget)}
+                  </li>
+                  <li>
+                    <span className="text-muted-foreground">Customer: </span>
+                    {markPaidTarget.customerName}
+                  </li>
+                  <li>
+                    <span className="text-muted-foreground">Amount: </span>₹{Number(markPaidTarget.totalAmount).toFixed(2)}
+                  </li>
+                </ul>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updatingId !== null}>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              disabled={updatingId !== null}
+              className={cn(buttonVariants(), "sm:mt-0")}
+              onClick={() => void confirmMarkPaid()}
+            >
+              {updatingId !== null ? "Saving…" : "Mark paid"}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
