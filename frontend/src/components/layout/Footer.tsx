@@ -31,7 +31,9 @@ const Footer = () => (
               />
             </span>
           </div>
-          <p className="text-sm leading-relaxed mb-6">Your one-stop shop for quality groceries. Fresh produce, artisan bakery, and daily essentials delivered to your door.</p>
+          <p className="text-sm leading-relaxed mb-6">
+            Handcrafting healthy and transparent snacks with pure ingredients and homemade care. Every bite is a memory in the making.
+          </p>
           <div className="flex flex-wrap gap-3">
             <a
               href={FACEBOOK_URL}
@@ -149,6 +151,7 @@ const Footer = () => (
     <div className="border-t border-background/10 py-6">
       <div className="container text-center text-sm text-background/50">
         © 2026 Royal Oven. All rights reserved.
+        {/* don't remove */}
       </div>
     </div>
   </footer>

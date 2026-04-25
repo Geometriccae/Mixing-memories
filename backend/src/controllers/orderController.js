@@ -6,6 +6,7 @@ const ApiError = require("../utils/ApiError");
 const { bustDetailJsonCache } = require("../utils/productDetailJsonCache");
 const { withMongoOpRetry } = require("../utils/mongoReadRetry");
 const { getActiveShippingFromUser } = require("../utils/userShippingAddress");
+const { getRazorpayClient } = require("../utils/razorpay");
 
 const ALLOWED_STATUSES = ["placed", "shipped", "completed", "cancelled"];
 const ALLOWED_PAYMENT_METHODS = ["upi", "netbanking", "card"];
@@ -235,7 +236,27 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
   await restockOrderItems(order.items);
   order.status = "cancelled";
   order.cancelledBy = "user";
-  order.cancelReason = "";
+  order.cancelReason = "Order cancelled by you.";
+
+  // Handle Automatic Refund
+  if (order.paymentStatus === "paid" && order.razorpayPaymentId) {
+    const rzp = getRazorpayClient();
+    if (rzp) {
+      try {
+        const refund = await rzp.payments.refund(order.razorpayPaymentId, {
+          notes: { orderNumber: order.orderNumber, reason: "Customer cancelled" }
+        });
+        order.refundId = refund.id;
+        order.refundStatus = refund.status === "processed" ? "processed" : "initiated";
+        order.cancelReason += ` Refund of ₹${order.totalAmount.toFixed(0)} is ${order.refundStatus === "processed" ? "completed" : "in progress"}.`;
+      } catch (err) {
+        console.error("Refund failed:", err);
+        order.refundStatus = "failed";
+        order.cancelReason += " Automatic refund failed. Please contact support.";
+      }
+    }
+  }
+
   await order.save();
   const out = await Order.findById(order._id).lean();
   res.json({ success: true, data: out });
@@ -294,6 +315,26 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     existing.status = "cancelled";
     existing.cancelledBy = "admin";
     existing.cancelReason = reason.slice(0, 2000);
+
+    // Handle Automatic Refund for Admin Cancellation
+    if (existing.paymentStatus === "paid" && existing.razorpayPaymentId) {
+      const rzp = getRazorpayClient();
+      if (rzp) {
+        try {
+          const refund = await rzp.payments.refund(existing.razorpayPaymentId, {
+            notes: { orderNumber: existing.orderNumber, reason: "Admin cancelled: " + reason }
+          });
+          existing.refundId = refund.id;
+          existing.refundStatus = refund.status === "processed" ? "processed" : "initiated";
+          existing.cancelReason += ` | Refund of ₹${existing.totalAmount.toFixed(0)} is ${existing.refundStatus === "processed" ? "completed" : "in progress"}.`;
+        } catch (err) {
+          console.error("Admin refund failed:", err);
+          existing.refundStatus = "failed";
+          existing.cancelReason += " | Automatic refund failed. Please contact support.";
+        }
+      }
+    }
+
     await existing.save();
     const out = await Order.findById(id).lean();
     return res.json({ success: true, data: out });

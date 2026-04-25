@@ -5,6 +5,7 @@ import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
 import SectionHeading from "@/components/common/SectionHeading";
 import ProductCard from "@/components/common/ProductCard";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 import type { Product } from "@/data/mockData";
 import { fetchPublicProducts, fetchPublicProductsSearch, mapApiProductToProduct } from "@/lib/catalogApi";
 import goldenJaggeryWhite from "@/assets/royal-oven-golden-jaggery-white.png";
@@ -64,12 +65,17 @@ const Products = () => {
             subtitle={q ? "Products matching your search" : "Fresh & quality products for your everyday needs"}
           />
           {loading ? (
-            <ProductGridSkeleton />
-          ) : (
+            <LoadingSpinner text="Fetching products for you..." />
+          ) : products.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {products.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-muted/30 rounded-2xl border border-dashed border-border">
+              <p className="text-lg font-medium text-foreground">No products found</p>
+              <p className="text-muted-foreground mt-2">Try adjusting your search or check back later.</p>
             </div>
           )}
         </SectionWrapper>

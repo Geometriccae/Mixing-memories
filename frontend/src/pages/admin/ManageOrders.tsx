@@ -171,18 +171,42 @@ const ManageOrders = () => {
                       ₹{Number(o.totalAmount).toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        value={o.status}
-                        disabled={o.status === "cancelled"}
-                        onChange={(e) => handleStatusChange(o._id, e.target.value)}
-                        className="border border-border rounded-md px-2 py-1.5 bg-background text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/20 capitalize disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                      {o.status === "completed" ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 capitalize">
+                          {o.status}
+                        </span>
+                      ) : o.status === "cancelled" ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 capitalize">
+                          {o.status}
+                        </span>
+                      ) : (
+                        <select
+                          value={o.status}
+                          onChange={(e) => handleStatusChange(o._id, e.target.value)}
+                          className="border border-border rounded-md px-2 py-1.5 bg-background text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/20 capitalize cursor-pointer"
+                        >
+                          {o.status === "placed" && (
+                            <>
+                              <option value="placed">Placed</option>
+                              <option value="shipped">Shipped</option>
+                              <option value="cancelled">Cancelled</option>
+                            </>
+                          )}
+                          {o.status === "shipped" && (
+                            <>
+                              <option value="shipped">Shipped</option>
+                              <option value="completed">Completed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </>
+                          )}
+                          {/* Fallback for other states if any */}
+                          {o.status !== "placed" && o.status !== "shipped" && (
+                            STATUS_OPTIONS.map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))
+                          )}
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button

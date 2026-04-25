@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 import type { Product } from "@/data/mockData";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
@@ -226,10 +227,7 @@ const ProductDetail = () => {
           </Link>
 
           {loading ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center sm:text-left">Loading product…</p>
-              <ProductDetailSkeleton />
-            </div>
+            <LoadingSpinner text="Loading product details..." />
           ) : !product ? (
             <div className="rounded-xl border border-border bg-card p-8 text-center">
               <p className="text-foreground font-medium">Product not found</p>

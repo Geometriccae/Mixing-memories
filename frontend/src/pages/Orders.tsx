@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { CircleCheck, Clock, FileDown, Loader2 } from "lucide-react";
+import { CircleAlert, CircleCheck, Clock, FileDown, Loader2, RefreshCw } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
@@ -32,33 +32,32 @@ const Orders = () => {
   const [payDialogOrder, setPayDialogOrder] = useState<OrderDoc | null>(null);
   const [payDialogMethod, setPayDialogMethod] = useState<PaymentMethod>("upi");
 
-  const statusLabel = useMemo(
-    () => (s: string) => {
-      const v = String(s || "").toLowerCase();
-      if (v === "placed") return "Ordered";
-      if (v === "shipped") return "Shipped";
-      if (v === "completed") return "Delivered";
-      if (v === "cancelled") return "Cancelled";
-      return s;
-    },
-    [],
-  );
- 
-  const statusStep = useMemo(
-    () => (s: string) => {
-      const v = String(s || "").toLowerCase();
-      if (v === "placed") return 0;
-      if (v === "shipped") return 1;
-      if (v === "completed") return 2;
-      return 0;
-    },
-    [],
-  );
- 
-  const stepTextClass = (idx: number, currentStep: number) => {
-    if (idx === currentStep) return "text-foreground font-medium";
-    if (idx < currentStep) return "text-foreground";
-    return "text-muted-foreground";
+  const statusLabel = (s: string) => {
+    const v = String(s || "").toLowerCase();
+    if (v === "placed") return "Ordered";
+    if (v === "shipped") return "Shipped";
+    if (v === "completed") return "Delivered";
+    if (v === "cancelled") return "Cancelled";
+    return s;
+  };
+
+  const getStatusColor = (s: string, ps: string) => {
+    const status = String(s || "").toLowerCase();
+    const payment = String(ps || "").toLowerCase();
+    
+    if (status === "cancelled") return "bg-destructive/10 text-destructive border-destructive/20";
+    if (status === "completed") return "bg-green-500/10 text-green-600 border-green-500/20";
+    if (status === "shipped") return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+    if (payment === "paid") return "bg-primary/10 text-primary border-primary/20";
+    return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+  };
+
+  const statusStep = (s: string) => {
+    const v = String(s || "").toLowerCase();
+    if (v === "placed") return 0;
+    if (v === "shipped") return 1;
+    if (v === "completed") return 2;
+    return 0;
   };
 
   const loadMyOrders = async () => {
@@ -81,20 +80,17 @@ const Orders = () => {
     void loadMyOrders();
   }, [token, pathname]);
 
-  const paymentView: "paid" | "unpaid" = pathname.includes("/success") ? "paid" : "unpaid";
-
-  const filteredOrders = useMemo(() => {
-    return myOrders.filter((o) => {
-      const ps = String(o.paymentStatus || "").toLowerCase();
-      const st = String(o.status || "").toLowerCase();
-      if (paymentView === "paid") return ps === "paid";
-      return ps !== "paid" && st !== "cancelled";
+  const sortedOrders = useMemo(() => {
+    return [...myOrders].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
     });
-  }, [myOrders, paymentView]);
+  }, [myOrders]);
 
   const openPayDialog = (o: OrderDoc) => {
     if (!token || !user) return;
-    void loadRazorpayScript().catch(() => {});
+    void loadRazorpayScript().catch(() => { });
     setPayDialogOrder(o);
     setPayDialogMethod(orderPaymentMethod(o));
     setPayDialogOpen(true);
@@ -117,10 +113,8 @@ const Orders = () => {
         if (msg === "Payment was cancelled.") {
           try {
             await abandonUnpaidOrder(token, o._id);
-            toast.error("Payment cancelled — order was not placed.");
-          } catch {
-            toast.error("Payment cancelled.");
-          }
+          } catch { }
+          toast.error("Payment cancelled.");
           await loadMyOrders();
         } else {
           toast.error(msg || "Payment failed.");
@@ -159,289 +153,208 @@ const Orders = () => {
   };
 
   if (!isLoading && !user) {
-    return <Navigate to="/auth" replace state={{ from: pathname || "/orders/pending" }} />;
+    return <Navigate to="/auth" replace state={{ from: pathname || "/orders" }} />;
   }
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen bg-muted/30">
       <Navbar />
-      <main className="min-h-screen">
-        <SectionWrapper>
-          <SectionHeading
-            title="My Orders"
-            subtitle={
-              paymentView === "paid"
-                ? "Orders with successful payment — download invoices here."
-                : "Orders that still need payment (or failed online) — use Pay now for Razorpay. When payment is confirmed (Razorpay or manually by the store), the order moves to the Successful tab."
-            }
-          />
-
-          <div className="max-w-3xl mx-auto space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <p className="text-sm text-muted-foreground">
-                Signed in as <span className="font-medium text-foreground">{user?.name}</span>
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex rounded-xl border border-border bg-card p-1">
-                  <Link
-                    to="/orders/success"
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      paymentView === "paid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Successful
-                  </Link>
-                  <Link
-                    to="/orders/pending"
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      paymentView === "unpaid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Pending
-                  </Link>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void loadMyOrders()}
-                  className="px-4 py-2 rounded-xl bg-muted text-foreground font-medium border border-border hover:bg-muted/80"
-                >
-                  Refresh
-                </button>
-              </div>
-            </div>
-
-            {loadingOrders ? (
-              <div className="rounded-xl border border-border bg-card p-10 flex flex-col items-center justify-center gap-3">
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <p className="text-sm text-muted-foreground">Loading orders...</p>
-              </div>
-            ) : myOrders.length === 0 ? (
-              <div className="rounded-xl border border-border bg-card p-8 text-center">
-                <p className="text-foreground font-medium">No orders yet</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Go to your <Link to="/cart" className="text-primary font-medium hover:underline">cart</Link> to place an order.
+      
+      <main className="flex-1 pb-20">
+        <div className="bg-white border-b border-border/50">
+          <SectionWrapper className="py-12 md:py-16">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-2">
+                <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight">Order History</h1>
+                <p className="text-muted-foreground text-sm md:text-base max-w-xl">
+                  Track your active orders, manage payments, and view your purchase history all in one place.
                 </p>
               </div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="rounded-xl border border-border bg-card p-10 text-center">
-                {paymentView === "paid" ? (
-                  <>
-                    <CircleCheck className="mx-auto h-12 w-12 text-muted-foreground/55" aria-hidden />
-                    <p className="mt-3 font-medium text-foreground">No successful orders yet</p>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="mx-auto h-12 w-12 text-muted-foreground/55" aria-hidden />
-                    <p className="mt-3 font-medium text-foreground">No pending orders</p>
-                  </>
-                )}
+              <button
+                type="button"
+                onClick={() => void loadMyOrders()}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95"
+              >
+                {loadingOrders ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Refresh List
+              </button>
+            </div>
+          </SectionWrapper>
+        </div>
+
+        <div className="container py-10 md:py-12">
+          {loadingOrders && myOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <p className="text-muted-foreground font-medium">Loading your orders...</p>
+            </div>
+          ) : sortedOrders.length === 0 ? (
+            <div className="max-w-2xl mx-auto text-center py-20 px-6 rounded-[2rem] bg-white border border-dashed border-border shadow-sm">
+              <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+                <Clock className="h-10 w-10 text-muted-foreground/40" />
               </div>
-            ) : (
-              <ul className="space-y-4">
-                {filteredOrders.map((o) => (
-                  <li key={o._id} className="rounded-xl border border-border bg-card p-4">
-                    <div className="flex flex-wrap justify-between gap-2 text-sm items-start">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Order ID</p>
-                        <p className="font-mono font-semibold text-foreground">{orderDisplayId(o)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {o.createdAt ? new Date(o.createdAt).toLocaleString() : "—"}
-                        </p>
+              <h2 className="text-2xl font-bold text-foreground mb-2">No orders found</h2>
+              <p className="text-muted-foreground mb-8">You haven't placed any orders yet. Start shopping to see your history here!</p>
+              <Link to="/products" className="inline-flex items-center px-8 py-3 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-90 transition-all">
+                Browse Products
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {sortedOrders.map((o) => (
+                <div key={o._id} className="group bg-white rounded-[2rem] border border-border/60 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden h-full">
+                  {/* Order Card Header */}
+                  <div className="p-5 border-b border-border/50 bg-muted/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${getStatusColor(o.status, o.paymentStatus || "")}`}>
+                        {statusLabel(o.status)}
+                      </span>
+                      <p className="text-lg font-black text-foreground tracking-tight">₹{Number(o.totalAmount).toFixed(2)}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest truncate">ID: {orderDisplayId(o)}</p>
+                      <p className="text-xs text-foreground/70 font-medium">
+                        {o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'long', year: 'numeric' }) : "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Order Card Content */}
+                  <div className="p-6 flex-1 flex flex-col space-y-6">
+                    {/* Status Stepper (Active or Cancelled Pipeline) */}
+                    {String(o.status).toLowerCase() === "cancelled" ? (
+                      <div className="space-y-6">
+                        <div className="relative py-2 px-1">
+                          <div className="flex items-center justify-between">
+                            {[0, 1, 2].map((idx) => {
+                              const refundStep = o.refundStatus === "processed" ? 2 : (o.refundStatus === "initiated" ? 1 : 0);
+                              const isActive = refundStep >= idx;
+                              const labels = ["Cancelled", "Refunded", "Completed"];
+                              return (
+                                <div key={idx} className="relative flex flex-col items-center flex-1">
+                                  {idx !== 0 && (
+                                    <div className={`absolute right-1/2 top-2 w-full h-0.5 -translate-y-1/2 z-0 ${isActive ? "bg-destructive" : "bg-muted"}`} />
+                                  )}
+                                  <div className={`relative z-10 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${isActive ? "bg-destructive border-destructive/20" : "bg-white border-muted"}`}>
+                                    {isActive && <div className="h-1.5 w-1.5 rounded-full bg-white shadow-sm" />}
+                                  </div>
+                                  <span className={`mt-2 text-[9px] font-black uppercase tracking-widest ${isActive ? "text-destructive" : "text-muted-foreground"}`}>
+                                    {labels[idx]}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {o.refundStatus && o.refundStatus !== "not_initiated" && (
+                          <div className="p-3 rounded-2xl bg-muted/30 border border-border/40">
+                             <p className="text-[10px] text-foreground/80 font-bold leading-tight">
+                               Refund of ₹{Number(o.totalAmount).toFixed(0)} is {o.refundStatus === "processed" ? "completed" : "in progress"}.
+                             </p>
+                             <p className="text-[9px] text-muted-foreground mt-1.5 leading-relaxed">
+                               Amount will be credited to your account within 5-7 business days.
+                             </p>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className="text-muted-foreground text-right">
-                          Status: <span className="font-medium text-foreground">{statusLabel(o.status)}</span>
-                        </span>
-                        {canDownloadOrderInvoice(o) ? (
+                    ) : (
+                      <div className="relative py-2 px-1">
+                        <div className="flex items-center justify-between">
+                          {[0, 1, 2].map((idx) => {
+                            const step = statusStep(o.status);
+                            const isActive = step >= idx;
+                            const labels = ["Ordered", "Shipped", "Delivered"];
+                            return (
+                              <div key={idx} className="relative flex flex-col items-center flex-1">
+                                {idx !== 0 && (
+                                  <div className={`absolute right-1/2 top-2 w-full h-0.5 -translate-y-1/2 z-0 ${isActive ? "bg-primary" : "bg-muted"}`} />
+                                )}
+                                <div className={`relative z-10 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${isActive ? "bg-primary border-primary/20" : "bg-white border-muted"}`}>
+                                  {isActive && <div className="h-1.5 w-1.5 rounded-full bg-white shadow-sm" />}
+                                </div>
+                                <span className={`mt-2 text-[9px] font-black uppercase tracking-widest ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                                  {labels[idx]}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Order Items List */}
+                    <div className="space-y-3 flex-1 overflow-y-auto max-h-[160px] pr-1 scrollbar-thin">
+                      {o.items.map((it, i) => (
+                        <Link 
+                          key={i}
+                          to={it.productId ? `/products/${it.productId}` : "#"}
+                          className="flex items-center gap-3 p-2 rounded-xl border border-border/40 hover:border-primary/20 hover:bg-muted/5 transition-all group/item"
+                        >
+                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted border border-border/50 flex-shrink-0">
+                            {it.image ? (
+                              <img src={it.image} alt="" className="h-full w-full object-cover group-hover/item:scale-110 transition-transform" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-muted-foreground/30 text-[10px]">?</div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-bold text-foreground truncate">{it.name}</p>
+                            <p className="text-[10px] text-muted-foreground">Qty {it.quantity} • ₹{Number(it.price).toFixed(0)}</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+
+                    {/* Action Footer */}
+                    <div className="pt-4 space-y-3 border-t border-border/40">
+                      <div className="flex items-center justify-between">
+                        {canDownloadOrderInvoice(o) && (
                           <button
                             type="button"
                             onClick={() => {
                               try {
                                 downloadOrderInvoicePdf(o);
                                 toast.success("Invoice downloaded");
-                              } catch (err) {
-                                const msg = err instanceof Error ? err.message : "Could not generate invoice.";
-                                toast.error(msg);
+                              } catch {
+                                toast.error("Error generating invoice.");
                               }
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/10 transition-colors"
+                            className="inline-flex items-center gap-2 text-primary text-[10px] font-black uppercase tracking-wider hover:underline"
                           >
-                            <FileDown className="h-3.5 w-3.5" />
-                            Download invoice
+                            <FileDown className="h-4 w-4" />
+                            Invoice
                           </button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-foreground mt-3">₹{Number(o.totalAmount).toFixed(2)} total</p>
-
-                    {paymentView === "unpaid" &&
-                    String(o.status).toLowerCase() === "placed" &&
-                    String(o.paymentStatus || "").toLowerCase() === "pending" ? (
-                      <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground leading-relaxed">
-                        <span className="font-medium">Order placed successfully.</span> Payment is still pending — use{" "}
-                        <span className="font-medium">Pay now</span> when you are ready.
-                      </div>
-                    ) : null}
-                    {paymentView === "unpaid" &&
-                    String(o.status).toLowerCase() === "placed" &&
-                    String(o.paymentStatus || "").toLowerCase() === "failed" ? (
-                      <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-foreground leading-relaxed">
-                        <span className="font-medium">Order placed successfully,</span> but the last payment attempt did not
-                        complete. Use <span className="font-medium">Pay now</span> to try again.
-                      </div>
-                    ) : null}
-
-                    {o.paymentMethod ? (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Payment: {String(o.paymentMethod).toUpperCase()}
-                        {o.paymentStatus != null ? (
-                          <>
-                            {" "}
-                            •{" "}
-                            <span className="font-medium text-foreground">{paymentStatusLabel(o.paymentStatus)}</span>
-                          </>
-                        ) : null}
-                      </p>
-                    ) : null}
- 
-                    {String(o.status).toLowerCase() === "cancelled" ? (
-                      <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm space-y-1.5">
-                        <p className="text-destructive font-medium">Cancelled</p>
-                        {o.cancelledBy === "admin" && String(o.cancelReason || "").trim() ? (
-                          <p className="text-foreground leading-relaxed">
-                            <span className="text-muted-foreground">Message from store: </span>
-                            {String(o.cancelReason).trim()}
-                          </p>
-                        ) : o.cancelledBy === "user" ? (
-                          <p className="text-muted-foreground">You cancelled this order.</p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3 sm:p-4">
-                        {(() => {
-                          const step = statusStep(o.status);
-                          const steps = ["Ordered", "Shipped", "Delivered"] as const;
-                          return (
-                            <div className="mx-auto max-w-md space-y-2">
-                              <div className="flex items-center">
-                                {steps.map((label, idx) => (
-                                  <div key={`track-${label}`} className="flex min-w-0 flex-1 items-center">
-                                    <div
-                                      className={`h-0.5 min-w-0 flex-1 rounded-full ${
-                                        idx === 0 ? "opacity-0" : step >= idx ? "bg-primary" : "bg-border"
-                                      }`}
-                                      aria-hidden
-                                    />
-                                    <div
-                                      className={`relative z-10 h-3.5 w-3.5 shrink-0 rounded-full border-2 bg-background ${
-                                        step >= idx ? "border-primary bg-primary" : "border-border"
-                                      }`}
-                                      title={label}
-                                    />
-                                    <div
-                                      className={`h-0.5 min-w-0 flex-1 rounded-full ${
-                                        idx === steps.length - 1
-                                          ? "opacity-0"
-                                          : step > idx
-                                            ? "bg-primary"
-                                            : "bg-border"
-                                      }`}
-                                      aria-hidden
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="flex">
-                                {steps.map((label, idx) => (
-                                  <div
-                                    key={label}
-                                    className={`min-w-0 flex-1 text-center text-[10px] leading-tight sm:text-xs ${stepTextClass(
-                                      idx,
-                                      step,
-                                    )}`}
-                                  >
-                                    {label}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {String(o.status).toLowerCase() === "placed" ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        {String(o.paymentStatus || "").toLowerCase() !== "paid" ? (
+                        )}
+                        {String(o.status).toLowerCase() === "placed" && (
                           <button
                             type="button"
-                            disabled={payingOrderId === o._id}
-                            onClick={() => openPayDialog(o)}
-                            className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                            onClick={() => setCancelOrderId(o._id)}
+                            className="text-[10px] font-bold text-destructive hover:underline uppercase tracking-wider"
                           >
-                            {payingOrderId === o._id ? "Opening payment…" : "Pay now"}
+                            Cancel
                           </button>
-                        ) : null}
+                        )}
+                      </div>
+
+                      {String(o.status).toLowerCase() === "placed" && String(o.paymentStatus || "").toLowerCase() !== "paid" && (
                         <button
                           type="button"
-                          onClick={() => setCancelOrderId(o._id)}
-                          className="text-sm font-medium text-destructive hover:underline"
+                          disabled={payingOrderId === o._id}
+                          onClick={() => openPayDialog(o)}
+                          className="w-full py-2.5 rounded-2xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-wider shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
                         >
-                          Cancel order
+                          {payingOrderId === o._id ? "Processing..." : "Pay Now"}
                         </button>
-                        <p className="text-xs text-muted-foreground w-full">
-                          You can cancel before the order ships. Stock will be returned to the store.
-                        </p>
-                      </div>
-                    ) : null}
-
-                    <ul className="mt-4 space-y-2">
-                      {o.items.map((it, i) => {
-                        const pid = it.productId ? String(it.productId) : "";
-                        const row = (
-                          <div className="flex items-center gap-3">
-                            {it.image ? (
-                              <img
-                                src={it.image}
-                                alt=""
-                                className="h-12 w-12 rounded-lg object-cover border border-border shrink-0"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="h-12 w-12 rounded-lg border border-dashed border-border bg-muted/40 shrink-0" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-foreground truncate">{it.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Qty {it.quantity} • ₹{Number(it.price).toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="text-sm font-semibold text-foreground tabular-nums">
-                              ₹{(Number(it.price) * Number(it.quantity)).toFixed(2)}
-                            </div>
-                          </div>
-                        );
-                        return (
-                          <li key={i} className="rounded-lg border border-border bg-background/50 p-3">
-                            {pid ? (
-                              <Link to={`/products/${pid}`} className="block hover:opacity-90 transition-opacity">
-                                {row}
-                              </Link>
-                            ) : (
-                              row
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </SectionWrapper>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
+
       <Footer />
 
       <PaymentMethodDialog
@@ -452,7 +365,7 @@ const Orders = () => {
         }}
         value={payDialogMethod}
         onChange={setPayDialogMethod}
-        title="How do you want to pay?"
+        title="Payment Method"
         confirmLabel="Continue to Razorpay"
         confirming={false}
         onConfirm={confirmPayDialog}
@@ -463,13 +376,13 @@ const Orders = () => {
         onOpenChange={(open) => {
           if (!open) setCancelOrderId(null);
         }}
-        title="Cancel this order?"
-        description="This cannot be undone. Items will be put back in stock."
-        confirmLabel={cancelling ? "Cancelling…" : "Yes, cancel order"}
+        title="Cancel Order?"
+        description="Are you sure you want to cancel this order? This action cannot be undone."
+        confirmLabel={cancelling ? "Cancelling..." : "Confirm Cancellation"}
         confirming={cancelling}
         onConfirm={confirmCancelOrder}
       />
-    </>
+    </div>
   );
 };
 
