@@ -100,6 +100,7 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
   }
 
   order.paymentStatus = "paid";
+  order.razorpayPaymentId = String(razorpay_payment_id);
   await withMongoOpRetry(() => order.save());
   const saved = await withMongoOpRetry(() => Order.findById(order._id).lean());
   res.json({ success: true, data: saved });

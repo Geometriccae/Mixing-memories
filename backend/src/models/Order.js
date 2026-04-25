@@ -43,6 +43,9 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
     razorpayOrderId: { type: String, default: "", trim: true },
+    razorpayPaymentId: { type: String, default: "", trim: true },
+    refundId: { type: String, default: "", trim: true },
+    refundStatus: { type: String, enum: ["not_initiated", "initiated", "processed", "failed"], default: "not_initiated" },
     items: {
       type: [orderItemSchema],
       required: true,

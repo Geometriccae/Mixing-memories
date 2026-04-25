@@ -289,6 +289,68 @@ const Navbar = () => {
           </div>
         </div>
 
+        {/* Mobile Search Bar - Visible only on small screens */}
+        <div className="lg:hidden container pb-3">
+          <form
+            className="relative"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitHeaderSearch();
+            }}
+          >
+            <div className="flex items-center bg-muted/80 rounded-xl px-4 py-2.5 border border-border/40 shadow-sm focus-within:bg-background focus-within:border-primary/30 transition-all">
+              <Search className="h-4 w-4 text-muted-foreground mr-3 shrink-0" aria-hidden />
+              <input
+                type="text"
+                value={headerSearch}
+                onChange={(e) => {
+                  setHeaderSearch(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setSearchOpen(false), 180);
+                }}
+                placeholder="Search products…"
+                autoComplete="off"
+                className="bg-transparent outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground min-w-0"
+              />
+            </div>
+            {searchOpen && headerSearch.trim().length >= 2 ? (
+              <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-border bg-card shadow-2xl max-h-80 overflow-auto">
+                {searchLoading ? (
+                  <p className="px-4 py-4 text-sm text-muted-foreground animate-pulse">Searching…</p>
+                ) : searchHits.length === 0 ? (
+                  <p className="px-4 py-4 text-sm text-muted-foreground">No matches found</p>
+                ) : (
+                  <ul className="py-2">
+                    {searchHits.map((p) => (
+                      <li key={p.id}>
+                        <Link
+                          to={`/products/${p.id}`}
+                          className="flex items-center gap-4 px-4 py-3 hover:bg-muted/60 text-left active:bg-muted"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setHeaderSearch("");
+                            setSearchOpen(false);
+                            setMobileOpen(false);
+                          }}
+                        >
+                          <img src={p.image} alt="" className="h-12 w-12 rounded-lg object-cover border border-border shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-foreground truncate">{p.name}</p>
+                            <p className="text-xs text-primary font-bold">₹{p.price.toFixed(2)}</p>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </form>
+        </div>
+
         {/* Mobile menu */}
         <AnimatePresence>
           {mobileOpen && (
@@ -352,34 +414,6 @@ const Navbar = () => {
                 >
                   Liked products{likeCount > 0 ? ` (${likeCount})` : ""}
                 </Link>
-                <form
-                  className="pt-2 border-t border-border mt-1"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    submitHeaderSearch();
-                  }}
-                >
-                  <label htmlFor="mobile-barcode-search" className="sr-only">
-                    Search products
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="mobile-barcode-search"
-                      type="text"
-                      value={headerSearch}
-                      onChange={(e) => setHeaderSearch(e.target.value)}
-                      placeholder="Search products…"
-                      autoComplete="off"
-                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary text-primary-foreground px-3 py-2 text-sm font-medium shrink-0"
-                    >
-                      Go
-                    </button>
-                  </div>
-                </form>
               </nav>
             </motion.div>
           )}

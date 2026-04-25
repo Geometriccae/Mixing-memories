@@ -50,6 +50,8 @@ export type OrderDoc = {
   status: string;
   cancelledBy?: "user" | "admin" | null;
   cancelReason?: string;
+  refundId?: string;
+  refundStatus?: "not_initiated" | "initiated" | "processed" | "failed";
   createdAt?: string;
   updatedAt?: string;
 };

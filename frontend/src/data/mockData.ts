@@ -69,7 +69,7 @@ export const products: Product[] = [
   },
   {
     id: "2",
-    name: "Royal Oven Golden Jaggery Granola",
+    name: "Rippon Kulkand Special",
     category: "Golden Jaggery",
     price: 9.49,
     image: goldenJaggeryHero,
@@ -133,6 +133,7 @@ export const products: Product[] = [
 ];
 
 export const marqueeItems = [
+  "🍬 Rippon Kulkand - Special Offer",
   "🥬 Fresh Vegetables 30% Off",
   "🍎 Organic Fruits 20% Off",
   "🥐 Artisan Bakery 15% Off",

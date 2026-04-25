@@ -93,7 +93,7 @@ async function restockSessionItems(items) {
   }
 }
 
-async function finalizeOrderFromSession(session, { paymentStatus, razorpayOrderId }) {
+async function finalizeOrderFromSession(session, { paymentStatus, razorpayOrderId, razorpayPaymentId }) {
   const orderNumber = await allocateOrderNumber();
   const order = await withMongoOpRetry(() =>
     Order.create({
@@ -106,6 +106,7 @@ async function finalizeOrderFromSession(session, { paymentStatus, razorpayOrderI
       paymentMethod: session.paymentMethod,
       paymentStatus,
       razorpayOrderId: razorpayOrderId != null ? String(razorpayOrderId).trim() : String(session.razorpayOrderId || "").trim(),
+      razorpayPaymentId: razorpayPaymentId != null ? String(razorpayPaymentId).trim() : "",
       items: session.items,
       totalAmount: session.totalAmount,
       status: "placed",
@@ -289,6 +290,7 @@ const verifyCheckoutSession = asyncHandler(async (req, res) => {
   const saved = await finalizeOrderFromSession(session, {
     paymentStatus: "paid",
     razorpayOrderId: razorpay_order_id,
+    razorpayPaymentId: razorpay_payment_id,
   });
   res.json({ success: true, data: saved });
 });

@@ -103,27 +103,33 @@ const ProductCard = ({ product }: { product: Product }) => {
             </button>
           </div>
         </div>
-        <div className="p-4">
-          {product.category ? <p className="text-xs text-muted-foreground mb-1">{product.category}</p> : null}
-          <h3 className="font-semibold text-card-foreground mb-2">{product.name}</h3>
-          <div className="flex items-center gap-1 mb-2">
+        <div className="p-2 sm:p-4 flex flex-col flex-1">
+          {product.category ? <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">{product.category}</p> : null}
+          <h3 className="font-bold text-card-foreground text-xs sm:text-base mb-1.5 line-clamp-2 leading-tight flex-1">
+            {product.name}
+          </h3>
+          <div className="flex items-center gap-0.5 mb-2 sm:mb-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star
                 key={i}
-                className={`h-3.5 w-3.5 ${i < Math.floor(product.rating) ? "fill-secondary text-secondary" : "text-border"}`}
+                className={`h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 ${i < Math.floor(product.rating) ? "fill-secondary text-secondary" : "text-border"}`}
               />
             ))}
-            <span className="text-xs text-muted-foreground ml-1">({product.rating})</span>
+            <span className="text-[10px] text-muted-foreground ml-1">({product.rating})</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-auto">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base sm:text-xl font-black text-primary">₹{product.price.toFixed(0)}</span>
+              {product.originalPrice != null ? (
+                <span className="text-[10px] sm:text-sm text-muted-foreground line-through opacity-70">
+                  ₹{product.originalPrice.toFixed(0)}
+                </span>
+              ) : null}
+            </div>
             {discountPct != null ? (
-              <span className="text-xs font-semibold tabular-nums px-2 py-0.5 rounded-md bg-primary/15 text-primary">
-                {discountPct}% off
+              <span className="inline-block text-[9px] sm:text-xs font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
+                {discountPct}% OFF
               </span>
-            ) : null}
-            <span className="text-lg font-bold text-primary">₹{product.price.toFixed(2)}</span>
-            {product.originalPrice != null ? (
-              <span className="text-sm text-muted-foreground line-through">₹{product.originalPrice.toFixed(2)}</span>
             ) : null}
           </div>
         </div>
