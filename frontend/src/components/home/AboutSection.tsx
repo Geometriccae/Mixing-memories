@@ -17,22 +17,26 @@ const AboutSection = () => (
         <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mt-3 mb-6">
           At Mixing Memories, Every Blend Is Thoughtfully Crafted with Pure Ingredients, Natural Goodness, and Mindful Care.
         </h2>
-        <p className="text-muted-foreground leading-relaxed mb-8">
-          ◆ We are Pioneer to introduce Right Snacks.
-          <br />
-          ◆ We are focused mixing healthy and transparent ingredients that are home made and packed with pure love.
-          <br />
-          <br />
-          <span className="font-semibold text-foreground">Our story</span>
-          <br />
-          It began with love for family and a promise to choose health without compromise.
-          <br />
-          At mixing memories every blend is thoughtfully crafted with pure ingredients natural goodness and mindful care.
-          <br />
-          No shortcuts no guilt just wholesome crunch in every bite.
-          <br />
-          Make to nourish your body and quietly become a part of your everyday memories.
-        </p>
+        <div className="space-y-4 text-muted-foreground leading-relaxed mb-8">
+          <p>
+            We are Pioneer to introduce Right Snacks.
+          </p>
+          <p>
+            We are focused mixing healthy and transparent ingredients that are home made and packed with pure love.
+          </p>
+          
+          <div className="pt-4">
+            <h3 className="font-display text-xl font-bold text-foreground mb-3 italic">Our story</h3>
+            <p>
+              It began with love for family and a promise to choose health without compromise.
+              At mixing memories every blend is thoughtfully crafted with pure ingredients natural goodness and mindful care.
+            </p>
+            <p className="mt-3">
+              No shortcuts no guilt just wholesome crunch in every bite.
+              Make to nourish your body and quietly become a part of your everyday memories.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
