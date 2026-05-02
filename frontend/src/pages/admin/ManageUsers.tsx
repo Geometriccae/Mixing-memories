@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { apiBaseUrl } from "@/lib/apiConfig";
 
 type ApiUserRow = {
   id: string;
@@ -13,7 +14,6 @@ type ApiUserRow = {
 const ManageUsers = () => {
   const [users, setUsers] = useState<ApiUserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const adminTokenRef = useRef<string | null>(sessionStorage.getItem("admin_token"));
 
   const requireAdminToken = () => {

@@ -290,9 +290,9 @@ const Orders = () => {
                           to={it.productId ? `/products/${it.productId}` : "#"}
                           className="flex items-center gap-3 p-2 rounded-xl border border-border/40 hover:border-primary/20 hover:bg-muted/5 transition-all group/item"
                         >
-                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted border border-border/50 flex-shrink-0">
+                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-white border border-border/50 flex-shrink-0 flex items-center justify-center p-0.5">
                             {it.image ? (
-                              <img src={it.image} alt="" className="h-full w-full object-cover group-hover/item:scale-110 transition-transform" />
+                              <img src={it.image} alt="" className="max-w-full max-h-full object-contain group-hover/item:scale-110 transition-transform" />
                             ) : (
                               <div className="h-full w-full flex items-center justify-center text-muted-foreground/30 text-[10px]">?</div>
                             )}

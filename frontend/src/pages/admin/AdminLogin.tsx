@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Lock, User } from "lucide-react";
+import { apiBaseUrl } from "@/lib/apiConfig";
 
 const AdminLogin = () => {
   const [username, setUsername] = useState("");
@@ -11,7 +12,6 @@ const AdminLogin = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
       const normalizedUsername = username.trim().toLowerCase();
       const demoTypedPassword = password.trim();

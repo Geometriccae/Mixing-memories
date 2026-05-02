@@ -1,4 +1,4 @@
-const apiBaseUrl = () => import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { apiBaseUrl } from "./apiConfig";
 
 export type UserAddress = {
   line1: string;
@@ -52,7 +52,7 @@ async function parseJson(res: Response): Promise<{ success?: boolean; message?: 
 }
 
 export async function loginRequest(identifier: string, password: string): Promise<AuthPayload> {
-  const res = await fetch(`${apiBaseUrl()}/api/auth/login`, {
+  const res = await fetch(`${apiBaseUrl}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ identifier: identifier.trim(), password }),
@@ -65,7 +65,7 @@ export async function loginRequest(identifier: string, password: string): Promis
 }
 
 export async function registerRequest(name: string, email: string, password: string): Promise<AuthPayload> {
-  const res = await fetch(`${apiBaseUrl()}/api/auth/register`, {
+  const res = await fetch(`${apiBaseUrl}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -82,7 +82,7 @@ export async function registerRequest(name: string, email: string, password: str
 }
 
 export async function fetchMe(token: string): Promise<UserPublic> {
-  const res = await fetch(`${apiBaseUrl()}/api/auth/me`, {
+  const res = await fetch(`${apiBaseUrl}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await parseJson(res);
@@ -115,7 +115,7 @@ export type ShopStatePatch = {
 };
 
 export async function patchShopStateRequest(token: string, body: ShopStatePatch): Promise<UserPublic> {
-  const res = await fetch(`${apiBaseUrl()}/api/auth/shop-state`, {
+  const res = await fetch(`${apiBaseUrl}/api/auth/shop-state`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -131,7 +131,7 @@ export async function patchShopStateRequest(token: string, body: ShopStatePatch)
 }
 
 export async function updateProfileRequest(token: string, body: ProfileUpdateBody): Promise<UserPublic> {
-  const res = await fetch(`${apiBaseUrl()}/api/auth/profile`, {
+  const res = await fetch(`${apiBaseUrl}/api/auth/profile`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

@@ -239,12 +239,12 @@ const ProductDetail = () => {
           ) : (
             <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-start">
               <div className="space-y-3 max-w-xl mx-auto w-full">
-                    <div className="rounded-xl overflow-hidden border border-border bg-muted aspect-square relative">
+                    <div className="rounded-xl overflow-hidden border border-border bg-white aspect-square relative flex items-center justify-center p-4">
                       {mainIsVideo ? (
                         <video
                           src={mainSrc}
                           controls
-                          className="w-full h-full object-contain bg-black"
+                          className="max-w-full max-h-full object-contain bg-black"
                           onLoadedData={() => setImageLoading(false)}
                           onError={() => setImageLoading(false)}
                         />
@@ -252,7 +252,7 @@ const ProductDetail = () => {
                         <img
                           src={mainSrc}
                           alt={product.name}
-                          className="w-full h-full object-cover"
+                          className="max-w-full max-h-full object-contain"
                           decoding="async"
                           fetchPriority="high"
                           onLoad={() => setImageLoading(false)}
@@ -278,14 +278,14 @@ const ProductDetail = () => {
                               setImageLoading(true);
                               setActiveImage(url);
                             }}
-                        className={`h-16 w-16 rounded-lg border overflow-hidden shrink-0 ${
+                        className={`h-16 w-16 rounded-lg border overflow-hidden shrink-0 bg-white flex items-center justify-center p-1 ${
                           isActive ? "ring-2 ring-primary ring-offset-2" : "border-border"
                         }`}
                       >
                         {isVid ? (
-                          <video src={url} className="w-full h-full object-cover bg-black" muted playsInline preload="metadata" />
+                          <video src={url} className="max-w-full max-h-full object-contain bg-black" muted playsInline preload="metadata" />
                         ) : (
-                          <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                          <img src={url} alt="" className="max-w-full max-h-full object-contain" loading="lazy" decoding="async" />
                         )}
                       </button>
                     );})}

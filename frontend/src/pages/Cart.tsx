@@ -228,7 +228,9 @@ const Cart = () => {
                 <ul className="space-y-3 rounded-xl border border-border bg-card divide-y divide-border">
                   {items.map((line) => (
                     <li key={line.productId} className="flex flex-wrap items-center gap-3 p-4">
-                      <img src={line.image} alt="" className="h-14 w-14 rounded-lg object-cover border border-border shrink-0" />
+                      <div className="h-14 w-14 rounded-lg bg-white border border-border shrink-0 flex items-center justify-center p-1">
+                        <img src={line.image} alt="" className="max-w-full max-h-full object-contain" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">{line.name}</p>
                         <p className="text-sm text-muted-foreground">₹{line.price.toFixed(2)} each</p>

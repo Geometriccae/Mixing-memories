@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { IndianRupee, Package, ShoppingCart, TrendingUp, User } from "lucide-react";
 import { toast } from "sonner";
+import { apiBaseUrl } from "@/lib/apiConfig";
 import OrderAnalyticsDateFilter from "@/components/admin/OrderAnalyticsDateFilter";
 import OrderStatusDonut from "@/components/admin/OrderStatusDonut";
 import OrdersTrendBarChart from "@/components/admin/OrdersTrendBarChart";
@@ -45,7 +46,7 @@ const StatCard = ({
   </div>
 );
 
-const apiUsers = () => `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/users`;
+const apiUsers = () => `${apiBaseUrl}/api/users`;
 
 const AdminDashboard = () => {
   const token = useMemo(() => sessionStorage.getItem("admin_token"), []);
