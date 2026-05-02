@@ -31,6 +31,7 @@ export interface Product {
   variantImageUrls?: string[];
   badge?: string;
   rating: number;
+  isLimitedAvailability?: boolean;
 }
 
 export interface Category {

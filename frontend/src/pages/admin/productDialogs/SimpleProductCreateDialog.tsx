@@ -25,6 +25,7 @@ export type CreateProductPayload = {
   /** Short product video (optional if coverFile is set) */
   videoFile: File | null;
   variantImageDataUrls: [string | null, string | null, string | null];
+  isLimitedAvailability: boolean;
 };
 
 type Props = {
@@ -56,6 +57,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
     null,
     null,
   ]);
+  const [isLimitedAvailability, setIsLimitedAvailability] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -78,6 +80,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
       setVideoFile(null);
       setVariantLabels(["No file", "No file", "No file"]);
       setVariantPreviews([null, null, null]);
+      setIsLimitedAvailability(false);
       setIsSaving(false);
     }
   }, [open]);
@@ -203,6 +206,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
         coverFile,
         videoFile,
         variantImageDataUrls: [...variantPreviews],
+        isLimitedAvailability,
       });
       onOpenChange(false);
     } finally {
@@ -292,6 +296,24 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
                   onChange={(e) => setMinStock(e.target.value)}
                   className="w-full rounded-md border border-border px-3 py-2.5 text-sm text-foreground bg-background outline-none focus:ring-2 focus:ring-primary/20"
                 />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-muted/30 p-3 rounded-lg border border-border/50">
+              <input
+                type="checkbox"
+                id="isLimited"
+                checked={isLimitedAvailability}
+                onChange={(e) => setIsLimitedAvailability(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <div className="flex-1">
+                <label htmlFor="isLimited" className="text-sm font-semibold text-foreground cursor-pointer block">
+                  Force "Limited Availability" Badge
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  Shows the "Limited Availability" tag to users regardless of actual stock levels.
+                </p>
               </div>
             </div>
 

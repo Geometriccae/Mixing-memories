@@ -12,6 +12,7 @@ const productSchema = new mongoose.Schema(
     minStock: { type: Number, default: 0, min: 0 },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
     subCategoryId: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", default: null },
+    isLimitedAvailability: { type: Boolean, default: false },
     /** Retail code e.g. RO-GULKAND 0001 (CODE128). Not exposed on public product JSON. */
     barcode: { type: String, trim: true },
     manufacturer: { type: String, default: "", trim: true },

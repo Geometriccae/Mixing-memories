@@ -19,4 +19,5 @@ export type AdminProductRow = {
   variantImageUrls: (string | null)[];
   /** Set on create (admin API only). Used for barcode PNG download. */
   barcode?: string;
+  isLimitedAvailability?: boolean;
 };
