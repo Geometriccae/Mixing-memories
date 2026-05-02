@@ -276,7 +276,7 @@ function publicProduct(doc, isAdmin = false, presence) {
     delete o.stock;
     delete o.minStock;
     o.inStock = stock > 0;
-    o.lowStock = stock > 0 && minStock > 0 && stock <= minStock;
+    o.lowStock = (stock > 0 && minStock > 0 && stock <= minStock) || o.isLimitedAvailability === true;
     o.outOfStock = stock <= 0;
     delete o.barcode;
   }
@@ -425,6 +425,7 @@ const createProduct = asyncHandler(async (req, res) => {
     hasVariant0: false,
     hasVariant1: false,
     hasVariant2: false,
+    isLimitedAvailability: req.body.isLimitedAvailability === "true" || req.body.isLimitedAvailability === true,
   };
   if (mainBuf) {
     doc.imageData = mainBuf;
@@ -774,7 +775,7 @@ const postProductsAvailability = asyncHandler(async (req, res) => {
   const objectIds = unique.filter((id) => mongoose.Types.ObjectId.isValid(id));
   const products = await withMongoReadRetry(() =>
     Product.find({ _id: { $in: objectIds } })
-      .select("stock minStock name")
+      .select("stock minStock name isLimitedAvailability")
       .lean(),
   );
   const byId = new Map(products.map((p) => [String(p._id), p]));
@@ -791,7 +792,7 @@ const postProductsAvailability = asyncHandler(async (req, res) => {
     const minStock = Number.isFinite(m) ? Math.max(0, Math.floor(m)) : 0;
     data[id] = {
       maxOrderable: stock,
-      lowStock: stock > 0 && minStock > 0 && stock <= minStock,
+      lowStock: (stock > 0 && minStock > 0 && stock <= minStock) || p.isLimitedAvailability === true,
       outOfStock: stock <= 0,
     };
   }
@@ -817,6 +818,9 @@ const updateProduct = asyncHandler(async (req, res) => {
 
   if (req.body.stock !== undefined) product.stock = parseStock(req.body.stock);
   if (req.body.minStock !== undefined) product.minStock = parseMinStock(req.body.minStock);
+  if (req.body.isLimitedAvailability !== undefined) {
+    product.isLimitedAvailability = req.body.isLimitedAvailability === "true" || req.body.isLimitedAvailability === true;
+  }
 
   const files = req.files || {};
   const mainList = files.image;

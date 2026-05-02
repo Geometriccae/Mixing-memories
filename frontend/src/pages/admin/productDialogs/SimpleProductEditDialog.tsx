@@ -27,6 +27,7 @@ export type UpdateProductPayload = {
   removeMainImage?: boolean;
   removeVideo?: boolean;
   removeVariants?: [boolean, boolean, boolean];
+  isLimitedAvailability: boolean;
 };
 
 type Props = {
@@ -52,6 +53,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const [removeVariants, setRemoveVariants] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const [isLimitedAvailability, setIsLimitedAvailability] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const mainInputRef = useRef<HTMLInputElement | null>(null);
   const variantInputRefs = useRef<Array<HTMLInputElement | null>>([null, null, null]);
@@ -96,6 +98,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
       product.variantImageUrls[2] ?? null,
     ]);
     setRemoveVariants([false, false, false]);
+    setIsLimitedAvailability(product.isLimitedAvailability || false);
     setIsSaving(false);
   }, [product, open]);
 
@@ -239,6 +242,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
         removeMainImage,
         removeVideo,
         removeVariants,
+        isLimitedAvailability,
       });
       onOpenChange(false);
     } catch {
@@ -325,6 +329,24 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
                   onChange={(e) => setMinStock(e.target.value)}
                   className="w-full rounded-md border border-border px-3 py-2.5 text-sm text-foreground bg-background outline-none focus:ring-2 focus:ring-primary/20"
                 />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-muted/30 p-3 rounded-lg border border-border/50">
+              <input
+                type="checkbox"
+                id="isLimitedEdit"
+                checked={isLimitedAvailability}
+                onChange={(e) => setIsLimitedAvailability(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <div className="flex-1">
+                <label htmlFor="isLimitedEdit" className="text-sm font-semibold text-foreground cursor-pointer block">
+                  Force "Limited Availability" Badge
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  Shows the "Limited Availability" tag to users regardless of actual stock levels.
+                </p>
               </div>
             </div>
 

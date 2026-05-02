@@ -11,7 +11,7 @@ type Props = {
 
 const ProductViewDialog = ({ open, onOpenChange, product }: Props) => {
   const handleBack = () => onOpenChange(false);
-  const stockLow = product ? product.minStock > 0 && product.stock <= product.minStock : false;
+  const stockLow = product ? (product.minStock > 0 && product.stock <= product.minStock) || product.isLimitedAvailability === true : false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,6 +62,19 @@ const ProductViewDialog = ({ open, onOpenChange, product }: Props) => {
                       <div>
                         <p className="text-sm font-bold text-[hsl(222_60%_26%)]">Min stock</p>
                         <p className="text-base font-bold text-[hsl(222_60%_22%)] mt-0.5">{product.minStock}</p>
+                      </div>
+                      <div className="col-span-1 sm:col-span-2">
+                        <p className="text-sm font-bold text-[hsl(222_60%_26%)]">Forced Limited Badge</p>
+                        <p className="text-base font-bold mt-0.5">
+                          {product.isLimitedAvailability ? (
+                            <span className="text-destructive flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                              Active (Always shows badge)
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground italic">Inactive</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div className="rounded-lg border border-border/60 bg-background/80 p-3 sm:p-4">

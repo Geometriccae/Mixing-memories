@@ -82,6 +82,7 @@ type ApiProduct = {
   updatedAt?: string;
   variantImageUrls?: (string | null)[];
   barcode?: string;
+  isLimitedAvailability?: boolean;
 };
 
 const ManageProducts = () => {
@@ -212,6 +213,7 @@ const ManageProducts = () => {
         hasVideo: Boolean(hasVideoFlag && videoUrl),
         variantImageUrls,
         barcode: typeof p.barcode === "string" && p.barcode.trim() ? p.barcode.trim() : undefined,
+        isLimitedAvailability: p.isLimitedAvailability === true,
       };
     },
     [apiBaseUrl],
@@ -290,6 +292,7 @@ const ManageProducts = () => {
           if (data.videoFile) {
             form.append("video", data.videoFile, data.videoFile.name || "clip");
           }
+          form.append("isLimitedAvailability", String(data.isLimitedAvailability));
           await appendVariantFiles(form, data.variantImageDataUrls);
 
           const res = await authedFetch("/api/products", { method: "POST", body: form }, true);
@@ -339,6 +342,7 @@ const ManageProducts = () => {
               if (flag) form.append(`removeVariant${i}`, "1");
             });
           }
+          form.append("isLimitedAvailability", String(data.isLimitedAvailability));
 
           await appendVariantFiles(form, data.variantImageDataUrls);
 
@@ -432,7 +436,7 @@ const ManageProducts = () => {
                   </tr>
                 ) : (
                   productSlice.map((r, idx) => {
-                    const stockLow = r.minStock > 0 && r.stock <= r.minStock;
+                    const stockLow = (r.minStock > 0 && r.stock <= r.minStock) || r.isLimitedAvailability === true;
                     return (
                       <tr
                         key={r.id}
