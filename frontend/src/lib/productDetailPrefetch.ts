@@ -1,6 +1,6 @@
 import type { ApiProductDoc } from "@/lib/catalogApi";
 
-const apiBaseUrl = () => import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { apiBaseUrl } from "./apiConfig";
 
 const store = new Map<string, { at: number; doc: ApiProductDoc }>();
 const TTL_MS = 60_000;
@@ -26,7 +26,7 @@ export function takeCachedProductDoc(id: string): ApiProductDoc | null {
 export function prefetchProductDetail(id: string): void {
   const trimmed = id.trim();
   if (!trimmed || takeCachedProductDoc(trimmed)) return;
-  void fetch(`${apiBaseUrl()}/api/products/${encodeURIComponent(trimmed)}`)
+  void fetch(`${apiBaseUrl}/api/products/${encodeURIComponent(trimmed)}`)
     .then((r) => (r.ok ? r.json() : null))
     .then((json: unknown) => {
       if (!json || typeof json !== "object" || !("data" in json)) return;

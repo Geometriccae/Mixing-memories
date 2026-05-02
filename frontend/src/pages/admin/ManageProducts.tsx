@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpDown, Barcode, Eye, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { apiBaseUrl } from "@/lib/apiConfig";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import SimpleProductCreateDialog from "@/pages/admin/productDialogs/SimpleProductCreateDialog";
 import SimpleProductEditDialog from "@/pages/admin/productDialogs/SimpleProductEditDialog";
@@ -96,7 +97,6 @@ const ManageProducts = () => {
   const [products, setProducts] = useState<AdminProductRow[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const adminTokenRef = useRef<string | null>(sessionStorage.getItem("admin_token"));
 
   const requireAdminToken = () => {
@@ -442,11 +442,13 @@ const ManageProducts = () => {
                         <td className="px-4 py-3 text-foreground max-w-[280px]">{r.name}</td>
                         <td className="px-4 py-3">
                           {r.hasImage ? (
-                            <img src={r.imageUrl} alt="" className="h-12 w-12 rounded object-cover border border-border" />
+                            <div className="h-12 w-12 rounded bg-white border border-border flex items-center justify-center p-0.5">
+                              <img src={r.imageUrl} alt="" className="max-w-full max-h-full object-contain" />
+                            </div>
                           ) : r.hasVideo ? (
                             <video
                               src={r.videoUrl}
-                              className="h-12 w-12 rounded object-cover border border-border bg-black"
+                              className="h-12 w-12 rounded object-contain border border-border bg-black"
                               muted
                               playsInline
                               preload="metadata"

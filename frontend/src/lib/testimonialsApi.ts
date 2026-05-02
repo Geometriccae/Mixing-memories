@@ -1,4 +1,4 @@
-const apiBaseUrl = () => import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { apiBaseUrl } from "./apiConfig";
 
 export type TestimonialDoc = {
   _id: string;
@@ -17,7 +17,7 @@ function parseList(json: unknown): TestimonialDoc[] {
 
 /** Public storefront: approved reviews only. */
 export async function fetchTestimonials(): Promise<TestimonialDoc[]> {
-  const res = await fetch(`${apiBaseUrl()}/api/testimonials`);
+  const res = await fetch(`${apiBaseUrl}/api/testimonials`);
   const json: unknown = await res.json().catch(() => ({}));
   if (!res.ok) return [];
   return parseList(json);
@@ -25,7 +25,7 @@ export async function fetchTestimonials(): Promise<TestimonialDoc[]> {
 
 /** Admin: all reviews including pending. */
 export async function fetchAllTestimonials(token: string): Promise<TestimonialDoc[]> {
-  const res = await fetch(`${apiBaseUrl()}/api/testimonials/all`, {
+  const res = await fetch(`${apiBaseUrl}/api/testimonials/all`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json: unknown = await res.json().catch(() => ({}));
@@ -41,7 +41,7 @@ export async function submitCustomerReview(
   token: string,
   payload: { text: string; rating?: number },
 ): Promise<TestimonialDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/testimonials/submit`, {
+  const res = await fetch(`${apiBaseUrl}/api/testimonials/submit`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -62,7 +62,7 @@ export async function submitCustomerReview(
 }
 
 export async function approveTestimonial(token: string, id: string): Promise<TestimonialDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/testimonials/${encodeURIComponent(id)}/approve`, {
+  const res = await fetch(`${apiBaseUrl}/api/testimonials/${encodeURIComponent(id)}/approve`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -82,7 +82,7 @@ export async function createTestimonial(
   token: string,
   payload: { name: string; text: string; rating?: number },
 ): Promise<TestimonialDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/testimonials`, {
+  const res = await fetch(`${apiBaseUrl}/api/testimonials`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -103,7 +103,7 @@ export async function createTestimonial(
 }
 
 export async function deleteTestimonial(token: string, id: string): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/api/testimonials/${encodeURIComponent(id)}`, {
+  const res = await fetch(`${apiBaseUrl}/api/testimonials/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });

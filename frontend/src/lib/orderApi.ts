@@ -1,4 +1,4 @@
-const apiBaseUrl = () => import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+import { apiBaseUrl } from "./apiConfig";
 
 export type OrderItemPayload = {
   productId?: string;
@@ -63,7 +63,7 @@ function parseData<T>(json: unknown): T | null {
 }
 
 export async function createOrder(token: string, payload: CreateOrderPayload): Promise<OrderDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/orders`, {
+  const res = await fetch(`${apiBaseUrl}/api/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -80,7 +80,7 @@ export async function createOrder(token: string, payload: CreateOrderPayload): P
 
 export async function fetchOrdersForCustomerEmail(email: string): Promise<OrderDoc[]> {
   const q = encodeURIComponent(email.trim());
-  const res = await fetch(`${apiBaseUrl()}/api/orders/customer?email=${q}`);
+  const res = await fetch(`${apiBaseUrl}/api/orders/customer?email=${q}`);
   const json: unknown = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
@@ -91,7 +91,7 @@ export async function fetchOrdersForCustomerEmail(email: string): Promise<OrderD
 }
 
 export async function fetchMyOrders(token: string): Promise<OrderDoc[]> {
-  const res = await fetch(`${apiBaseUrl()}/api/orders/my`, {
+  const res = await fetch(`${apiBaseUrl}/api/orders/my`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json: unknown = await res.json().catch(() => ({}));
@@ -115,7 +115,7 @@ export async function fetchAdminOrders(
   token: string,
   filters?: AdminOrderFilters | string | null,
 ): Promise<OrderDoc[]> {
-  const base = `${apiBaseUrl()}/api/orders`;
+  const base = `${apiBaseUrl}/api/orders`;
   let orderStatus: string | undefined;
   let paymentStatus: string | undefined;
   let from: string | undefined;
@@ -147,7 +147,7 @@ export async function fetchAdminOrders(
 }
 
 export async function patchOrderPaymentStatus(token: string, orderId: string, paymentStatus: string): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/payment-status`, {
+  const res = await fetch(`${apiBaseUrl}/api/orders/${orderId}/payment-status`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -172,7 +172,7 @@ export async function patchOrderStatus(
   if (status === "cancelled" && cancelReason != null && cancelReason.trim()) {
     body.cancelReason = cancelReason.trim();
   }
-  const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/status`, {
+  const res = await fetch(`${apiBaseUrl}/api/orders/${orderId}/status`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -196,7 +196,7 @@ export type RazorpayCheckoutBundle = {
 };
 
 export async function createRazorpayOrderForCheckout(token: string, orderId: string): Promise<RazorpayCheckoutBundle> {
-  const res = await fetch(`${apiBaseUrl()}/api/payments/razorpay/order`, {
+  const res = await fetch(`${apiBaseUrl}/api/payments/razorpay/order`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ orderId }),
@@ -220,7 +220,7 @@ export async function verifyRazorpayPayment(
   razorpay_payment_id: string,
   razorpay_signature: string,
 ): Promise<OrderDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/payments/razorpay/verify`, {
+  const res = await fetch(`${apiBaseUrl}/api/payments/razorpay/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }),
@@ -236,7 +236,7 @@ export async function verifyRazorpayPayment(
 }
 
 export async function cancelMyOrder(token: string, orderId: string): Promise<OrderDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/cancel`, {
+  const res = await fetch(`${apiBaseUrl}/api/orders/${orderId}/cancel`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -252,7 +252,7 @@ export async function cancelMyOrder(token: string, orderId: string): Promise<Ord
 
 /** Deletes an unpaid placed order and restocks (e.g. user closed Razorpay during cart checkout). */
 export async function abandonUnpaidOrder(token: string, orderId: string): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/api/orders/${orderId}/abandon`, {
+  const res = await fetch(`${apiBaseUrl}/api/orders/${orderId}/abandon`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -267,7 +267,7 @@ export async function abandonUnpaidOrder(token: string, orderId: string): Promis
 export type CheckoutSessionBundle = RazorpayCheckoutBundle & { sessionId: string };
 
 export async function startCheckoutSession(token: string, payload: CreateOrderPayload): Promise<CheckoutSessionBundle> {
-  const res = await fetch(`${apiBaseUrl()}/api/checkout/session`, {
+  const res = await fetch(`${apiBaseUrl}/api/checkout/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -291,7 +291,7 @@ export async function verifyCheckoutSessionPayment(
   razorpay_payment_id: string,
   razorpay_signature: string,
 ): Promise<OrderDoc> {
-  const res = await fetch(`${apiBaseUrl()}/api/checkout/session/${encodeURIComponent(sessionId)}/verify`, {
+  const res = await fetch(`${apiBaseUrl}/api/checkout/session/${encodeURIComponent(sessionId)}/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature }),
@@ -307,7 +307,7 @@ export async function verifyCheckoutSessionPayment(
 }
 
 export async function abandonCheckoutSession(token: string, sessionId: string): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/api/checkout/session/${encodeURIComponent(sessionId)}/abandon`, {
+  const res = await fetch(`${apiBaseUrl}/api/checkout/session/${encodeURIComponent(sessionId)}/abandon`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -320,7 +320,7 @@ export async function abandonCheckoutSession(token: string, sessionId: string): 
 
 /** After Razorpay `payment.failed` — creates a failed Order row; session is removed server-side. */
 export async function markCheckoutSessionPaymentFailed(token: string, sessionId: string): Promise<OrderDoc | null> {
-  const res = await fetch(`${apiBaseUrl()}/api/checkout/session/${encodeURIComponent(sessionId)}/payment-failed`, {
+  const res = await fetch(`${apiBaseUrl}/api/checkout/session/${encodeURIComponent(sessionId)}/payment-failed`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });

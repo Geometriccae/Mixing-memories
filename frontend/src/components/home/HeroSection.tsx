@@ -52,12 +52,15 @@ const HeroSection = () => {
   return (
     <>
       <section className="hero-gradient relative overflow-hidden">
-        <div className="container grid lg:grid-cols-2 gap-8 items-center py-12 md:py-20 lg:py-28">
+        <div className="container grid lg:grid-cols-2 gap-y-4 gap-x-8 items-center pt-5 pb-12 md:pt-12 md:pb-20 lg:pt-16 lg:pb-28">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7 }}>
             <h1 className="font-display font-bold text-foreground leading-tight mb-6">
-              <span className="text-4xl md:text-5xl lg:text-6xl block mb-2">Right snack, Right now,</span>
-              <span className="text-xl md:text-2xl lg:text-3xl text-gradient block">Where every Crunch tells a story</span>
-              {/* don't remove */}
+              <span className="text-[22px] min-[380px]:text-3xl sm:text-4xl md:text-5xl lg:text-6xl block mb-2 whitespace-nowrap">
+                Right snack, Right now,
+              </span>
+              <span className="text-[13px] min-[380px]:text-sm sm:text-xl md:text-2xl lg:text-3xl text-gradient block opacity-90 tracking-wider uppercase font-semibold">
+                Where every Crunch tells a story
+              </span>
             </h1>
             <p className="text-muted-foreground text-lg mb-8 max-w-lg">
               Discover the pioneer of Right Snacks. Handcrafted with pure, transparent ingredients and a lot of love  wholesome goodness delivered to your doorstep.
@@ -97,7 +100,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="relative flex justify-center lg:justify-end items-center h-[450px] md:h-[550px] perspective-1000"
+            className="relative flex justify-center lg:justify-end items-center h-[400px] md:h-[550px] perspective-1000"
           >
             <div className="relative w-full max-w-[600px] h-full flex items-center justify-center">
               {loading || marqueeProducts.length === 0 ? (

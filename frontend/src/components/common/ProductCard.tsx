@@ -25,11 +25,11 @@ const ProductCard = ({ product }: { product: Product }) => {
         onMouseEnter={() => prefetchProductDetail(product.id)}
         onFocus={() => prefetchProductDetail(product.id)}
       >
-        <div className="relative overflow-hidden aspect-square bg-muted">
+        <div className="relative overflow-hidden aspect-square bg-white flex items-center justify-center p-2 sm:p-4">
           {product.hasCoverImage === false && product.videoUrl ? (
             <video
               src={product.videoUrl}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500"
               muted
               playsInline
               loop
@@ -40,7 +40,7 @@ const ProductCard = ({ product }: { product: Product }) => {
             <img
               src={product.image}
               alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
               decoding="async"
             />

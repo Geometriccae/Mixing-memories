@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight, IndianRupee, Package, ShoppingCart, User } from "lucide-react";
 import { toast } from "sonner";
+import { apiBaseUrl } from "@/lib/apiConfig";
 import OrderAnalyticsDateFilter from "@/components/admin/OrderAnalyticsDateFilter";
 import OrderStatusDonut from "@/components/admin/OrderStatusDonut";
 import OrdersTrendBarChart from "@/components/admin/OrdersTrendBarChart";
@@ -46,7 +47,7 @@ const StatCard = ({
   </div>
 );
 
-const apiUsers = () => `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/users`;
+const apiUsers = () => `${apiBaseUrl}/api/users`;
 
 const AdminOrdersOverview = () => {
   const token = useMemo(() => sessionStorage.getItem("admin_token"), []);
