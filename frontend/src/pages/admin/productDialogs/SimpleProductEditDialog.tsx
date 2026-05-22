@@ -28,6 +28,7 @@ export type UpdateProductPayload = {
   removeVideo?: boolean;
   removeVariants?: [boolean, boolean, boolean];
   isLimitedAvailability: boolean;
+  showInCarousel: boolean;
 };
 
 type Props = {
@@ -54,6 +55,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const [removeVariants, setRemoveVariants] = useState<[boolean, boolean, boolean]>([false, false, false]);
   const [isLimitedAvailability, setIsLimitedAvailability] = useState(false);
+  const [showInCarousel, setShowInCarousel] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const mainInputRef = useRef<HTMLInputElement | null>(null);
   const variantInputRefs = useRef<Array<HTMLInputElement | null>>([null, null, null]);
@@ -83,7 +85,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
     setPrice(String(product.price));
     setActualPrice(product.actualPrice != null ? String(product.actualPrice) : "");
     setStock(String(product.stock));
-    setMinStock(String(product.minStock));
+    setMinStock(product.minStock > 0 ? String(product.minStock) : "");
     setMainFileLabel("No file chosen");
     setMainImage(null);
     setRemoveMainImage(false);
@@ -99,6 +101,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
     ]);
     setRemoveVariants([false, false, false]);
     setIsLimitedAvailability(product.isLimitedAvailability || false);
+    setShowInCarousel(product.showInCarousel || false);
     setIsSaving(false);
   }, [product, open]);
 
@@ -243,6 +246,7 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
         removeVideo,
         removeVariants,
         isLimitedAvailability,
+        showInCarousel,
       });
       onOpenChange(false);
     } catch {
@@ -346,6 +350,24 @@ const SimpleProductEditDialog = ({ open, onOpenChange, product, onUpdate }: Prop
                 </label>
                 <p className="text-[10px] text-muted-foreground">
                   Shows the "Limited Availability" tag to users regardless of actual stock levels.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 mt-2">
+              <input
+                type="checkbox"
+                id="editShowInCarousel"
+                checked={showInCarousel}
+                onChange={(e) => setShowInCarousel(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <div className="flex-1">
+                <label htmlFor="editShowInCarousel" className="text-sm font-semibold text-foreground cursor-pointer block">
+                  Show in 3D Carousel
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  If selected, this product will appear in the 3D Carousel on the home page.
                 </p>
               </div>
             </div>

@@ -26,6 +26,7 @@ export type CreateProductPayload = {
   videoFile: File | null;
   variantImageDataUrls: [string | null, string | null, string | null];
   isLimitedAvailability: boolean;
+  showInCarousel: boolean;
 };
 
 type Props = {
@@ -58,6 +59,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
     null,
   ]);
   const [isLimitedAvailability, setIsLimitedAvailability] = useState(false);
+  const [showInCarousel, setShowInCarousel] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -81,6 +83,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
       setVariantLabels(["No file", "No file", "No file"]);
       setVariantPreviews([null, null, null]);
       setIsLimitedAvailability(false);
+      setShowInCarousel(false);
       setIsSaving(false);
     }
   }, [open]);
@@ -207,6 +210,7 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
         videoFile,
         variantImageDataUrls: [...variantPreviews],
         isLimitedAvailability,
+        showInCarousel,
       });
       onOpenChange(false);
     } finally {
@@ -313,6 +317,24 @@ const SimpleProductCreateDialog = ({ open, onOpenChange, onCreate }: Props) => {
                 </label>
                 <p className="text-[10px] text-muted-foreground">
                   Shows the "Limited Availability" tag to users regardless of actual stock levels.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 mt-2">
+              <input
+                type="checkbox"
+                id="showInCarousel"
+                checked={showInCarousel}
+                onChange={(e) => setShowInCarousel(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              <div className="flex-1">
+                <label htmlFor="showInCarousel" className="text-sm font-semibold text-foreground cursor-pointer block">
+                  Show in 3D Carousel
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  If selected, this product will appear in the 3D Carousel on the home page.
                 </p>
               </div>
             </div>

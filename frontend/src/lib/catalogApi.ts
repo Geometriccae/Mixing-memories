@@ -23,6 +23,7 @@ export type ApiProductDoc = {
   image?: string;
   updatedAt?: string;
   variantImageUrls?: (string | null)[];
+  showInCarousel?: boolean;
 };
 
 export type ProductAvailability = {
@@ -199,5 +200,6 @@ export function mapApiProductToProduct(p: ApiProductDoc, fallbackImage: string):
     videoUrl: vid || undefined,
     variantImageUrls: variants.length ? variants : undefined,
     rating: 4.8,
+    showInCarousel: p.showInCarousel === true,
   };
 }

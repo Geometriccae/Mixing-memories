@@ -32,6 +32,7 @@ export interface Product {
   badge?: string;
   rating: number;
   isLimitedAvailability?: boolean;
+  showInCarousel?: boolean;
 }
 
 export interface Category {

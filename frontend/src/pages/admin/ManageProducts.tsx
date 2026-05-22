@@ -83,6 +83,7 @@ type ApiProduct = {
   variantImageUrls?: (string | null)[];
   barcode?: string;
   isLimitedAvailability?: boolean;
+  showInCarousel?: boolean;
 };
 
 const ManageProducts = () => {
@@ -214,6 +215,7 @@ const ManageProducts = () => {
         variantImageUrls,
         barcode: typeof p.barcode === "string" && p.barcode.trim() ? p.barcode.trim() : undefined,
         isLimitedAvailability: p.isLimitedAvailability === true,
+        showInCarousel: p.showInCarousel === true,
       };
     },
     [apiBaseUrl],
@@ -262,6 +264,60 @@ const ManageProducts = () => {
   const start = (safePage - 1) * pageSize;
   const productSlice = filteredProducts.slice(start, start + pageSize);
 
+  // Optimistic carousel toggle — updates local state instantly, no full re-render
+  const toggleCarousel = useCallback(
+    async (id: string, checked: boolean) => {
+      // Optimistically update local state
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, showInCarousel: checked } : p))
+      );
+      try {
+        const form = new FormData();
+        form.append("showInCarousel", String(checked));
+        const res = await authedFetch(`/api/products/${id}`, { method: "PUT", body: form }, true);
+        if (!res.ok) throw new Error("Failed");
+        toast.success(checked ? "Added to 3D Carousel" : "Removed from 3D Carousel");
+      } catch {
+        // Revert on failure
+        setProducts((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, showInCarousel: !checked } : p))
+        );
+        toast.error("Update failed, reverted.");
+      }
+    },
+    [authedFetch],
+  );
+
+  // Select All — toggles all products on current page
+  const allPageSelected = productSlice.length > 0 && productSlice.every((r) => r.showInCarousel === true);
+  const somePageSelected = productSlice.some((r) => r.showInCarousel === true);
+
+  const toggleSelectAll = useCallback(async () => {
+    const newVal = !allPageSelected;
+    const ids = productSlice.map((r) => r.id);
+    // Optimistically update all on this page
+    setProducts((prev) =>
+      prev.map((p) => (ids.includes(p.id) ? { ...p, showInCarousel: newVal } : p))
+    );
+    try {
+      await Promise.all(
+        ids.map(async (id) => {
+          const form = new FormData();
+          form.append("showInCarousel", String(newVal));
+          const res = await authedFetch(`/api/products/${id}`, { method: "PUT", body: form }, true);
+          if (!res.ok) throw new Error("Failed");
+        })
+      );
+      toast.success(newVal ? "All added to 3D Carousel" : "All removed from 3D Carousel");
+    } catch {
+      // Revert on failure
+      setProducts((prev) =>
+        prev.map((p) => (ids.includes(p.id) ? { ...p, showInCarousel: !newVal } : p))
+      );
+      toast.error("Bulk update failed, reverted.");
+    }
+  }, [allPageSelected, productSlice, authedFetch]);
+
   return (
     <>
       <SimpleProductCreateDialog
@@ -293,6 +349,7 @@ const ManageProducts = () => {
             form.append("video", data.videoFile, data.videoFile.name || "clip");
           }
           form.append("isLimitedAvailability", String(data.isLimitedAvailability));
+          form.append("showInCarousel", String(data.showInCarousel));
           await appendVariantFiles(form, data.variantImageDataUrls);
 
           const res = await authedFetch("/api/products", { method: "POST", body: form }, true);
@@ -343,6 +400,7 @@ const ManageProducts = () => {
             });
           }
           form.append("isLimitedAvailability", String(data.isLimitedAvailability));
+          form.append("showInCarousel", String(data.showInCarousel));
 
           await appendVariantFiles(form, data.variantImageDataUrls);
 
@@ -418,6 +476,19 @@ const ManageProducts = () => {
                   <th className={`${thClass} text-center`}>Selling{sortIcon}</th>
                   <th className={`${thClass} text-center`}>Stock{sortIcon}</th>
                   <th className={`${thClass} text-center`}>Min{sortIcon}</th>
+                  <th className={`${thClass} text-center`}>
+                    <div className="flex flex-col items-center gap-1">
+                      <span>3D Carousel</span>
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        ref={(el) => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+                        onChange={() => void toggleSelectAll()}
+                        className="h-4 w-4 cursor-pointer rounded border-white/50 focus:ring-white/30"
+                        title="Select all on this page"
+                      />
+                    </div>
+                  </th>
                   <th className={`${thClass} text-center`}>Action{sortIcon}</th>
                 </tr>
               </thead>
@@ -466,6 +537,15 @@ const ManageProducts = () => {
                           {r.stock}
                         </td>
                         <td className="px-4 py-3 text-center tabular-nums text-muted-foreground">{r.minStock}</td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={r.showInCarousel === true}
+                            onChange={(e) => void toggleCarousel(r.id, e.target.checked)}
+                            className="h-4 w-4 cursor-pointer rounded border-border text-primary focus:ring-primary/20"
+                            title="Show in 3D Carousel"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <ActionButtons
                             onView={() => {

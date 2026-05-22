@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -8,20 +8,26 @@ import type { Product } from "@/data/mockData";
 import goldenJaggeryWhite from "@/assets/royal-oven-golden-jaggery-white.png";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 
-const MARQUEE_LIMIT = 15;
+const MARQUEE_LIMIT = 100;
 
 const HeroSection = () => {
   const [marqueeProducts, setMarqueeProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
 
+  const carouselProducts = useMemo(() => {
+    const selected = marqueeProducts.filter((p) => p.showInCarousel);
+    return selected.length > 0 ? selected : marqueeProducts;
+  }, [marqueeProducts]);
+
   useEffect(() => {
-    if (marqueeProducts.length === 0) return;
+    if (carouselProducts.length === 0) return;
+    const slideCount = carouselProducts.length;
     const interval = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % Math.min(marqueeProducts.length, 5));
+      setActiveIndex((prev) => (prev + 1) % slideCount);
     }, 4000);
     return () => clearInterval(interval);
-  }, [marqueeProducts.length]);
+  }, [carouselProducts.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,8 +52,7 @@ const HeroSection = () => {
     };
   }, []);
 
-  const loop =
-    marqueeProducts.length > 0 ? [...marqueeProducts, ...marqueeProducts] : [];
+  const loop = marqueeProducts.length > 0 ? [...marqueeProducts, ...marqueeProducts] : [];
 
   return (
     <>
@@ -103,16 +108,17 @@ const HeroSection = () => {
             className="relative flex justify-center lg:justify-end items-center h-[400px] md:h-[550px] perspective-1000"
           >
             <div className="relative w-full max-w-[600px] h-full flex items-center justify-center">
-              {loading || marqueeProducts.length === 0 ? (
+              {loading || carouselProducts.length === 0 ? (
                 <div className="w-full h-[300px] rounded-3xl bg-muted/50 animate-pulse flex items-center justify-center">
                   <img src={heroImg} alt="Loading..." className="w-1/2 h-1/2 object-contain opacity-20" />
                 </div>
               ) : (
                 <div className="relative w-full h-full flex items-center justify-center preserve-3d">
-                  {marqueeProducts.slice(0, 5).map((p, i) => {
-                    // Calculate relative index for 3D position
-                    let relativeIndex = (i - activeIndex + 5) % 5;
-                    if (relativeIndex > 2) relativeIndex -= 5;
+                  {carouselProducts.map((p, i) => {
+                    const N = carouselProducts.length;
+                    // Calculate relative index for 3D position dynamically based on total products
+                    let relativeIndex = (i - activeIndex + N) % N;
+                    if (relativeIndex > Math.floor(N / 2)) relativeIndex -= N;
 
                     return (
                       <motion.div
@@ -167,8 +173,8 @@ const HeroSection = () => {
             </div>
 
             {/* Navigation Dots - Centered under images */}
-            <div className="absolute -bottom-10 md:-bottom-12 left-1/2 -translate-x-1/2 flex gap-2.5 z-40">
-              {marqueeProducts.slice(0, 5).map((_, i) => (
+            <div className="absolute -bottom-10 md:-bottom-12 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-2.5 z-40 w-[90%] md:max-w-md">
+              {carouselProducts.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveIndex(i)}

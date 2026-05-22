@@ -281,6 +281,8 @@ function publicProduct(doc, isAdmin = false, presence) {
     delete o.barcode;
   }
 
+  o.showInCarousel = o.showInCarousel === true;
+
   const id = String(o._id);
   const v = o.updatedAt ? new Date(o.updatedAt).getTime() : Date.now();
   o.imageUrl = hasImageFlag ? `/api/products/${id}/image?v=${v}` : null;
@@ -426,6 +428,7 @@ const createProduct = asyncHandler(async (req, res) => {
     hasVariant1: false,
     hasVariant2: false,
     isLimitedAvailability: req.body.isLimitedAvailability === "true" || req.body.isLimitedAvailability === true,
+    showInCarousel: req.body.showInCarousel === "true" || req.body.showInCarousel === true,
   };
   if (mainBuf) {
     doc.imageData = mainBuf;
@@ -820,6 +823,9 @@ const updateProduct = asyncHandler(async (req, res) => {
   if (req.body.minStock !== undefined) product.minStock = parseMinStock(req.body.minStock);
   if (req.body.isLimitedAvailability !== undefined) {
     product.isLimitedAvailability = req.body.isLimitedAvailability === "true" || req.body.isLimitedAvailability === true;
+  }
+  if (req.body.showInCarousel !== undefined) {
+    product.showInCarousel = req.body.showInCarousel === "true" || req.body.showInCarousel === true;
   }
 
   const files = req.files || {};
