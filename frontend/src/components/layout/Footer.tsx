@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { MapPin, Phone, Mail, Facebook, Instagram, Globe, Smartphone, FileText } from "lucide-react";
+import { MapPin, Phone, Mail, Facebook, Instagram, Globe, Smartphone, FileText, BadgeCheck } from "lucide-react";
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
+import fssaiLicenseQr from "@/assets/fssai_license_qr.png";
 
 const WHATSAPP_CHAT_URL = "https://wa.me/917338843363";
 const FACEBOOK_URL = "https://www.facebook.com/RO.RoyalOven";
@@ -67,7 +68,7 @@ const Footer = () => (
         <div>
           <h4 className="font-display text-lg font-semibold text-background mb-4">Quick Links</h4>
           <ul className="space-y-2 text-sm">
-            {[{ to: "/", label: "Home" }, { to: "/about", label: "About Us" }, { to: "/products", label: "Products" }, { to: "/contact", label: "Contact" }].map(l => (
+            {[{ to: "/", label: "Home" }, { to: "/about", label: "About Us" }, { to: "/products", label: "Products" }, { to: "/contact", label: "Contact" }, { to: "/return-refund-policy", label: "Return & Refund Policy" }].map(l => (
               <li key={l.to}><Link to={l.to} className="hover:text-primary transition-colors">{l.label}</Link></li>
             ))}
           </ul>
@@ -141,8 +142,15 @@ const Footer = () => (
               <span>GST No: 33ACGFM2172B1ZQ</span>
             </li>
             <li className="flex items-start gap-2">
-              <FileText className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>FSSAI No: 12426023000272</span>
+              <BadgeCheck className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <span>Quality Guaranteed: Quality Assured and certified from FSSAI No: 12426023000272</span>
+            </li>
+            <li className="pl-6 mt-1">
+              <img
+                src={fssaiLicenseQr}
+                alt="FSSAI License QR"
+                className="h-16 w-16 object-contain rounded bg-white p-0.5 border border-background/20"
+              />
             </li>
           </ul>
         </div>

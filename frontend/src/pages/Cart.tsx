@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Minus, Plus } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import SectionWrapper from "@/components/common/SectionWrapper";
@@ -25,6 +25,7 @@ const Cart = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [pmOpen, setPmOpen] = useState(false);
   const [pmForProductId, setPmForProductId] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +59,7 @@ const Cart = () => {
     }
   }, [token, user, addressOk, items.length]);
 
-  const placeOrderDisabled = submitting || items.length === 0 || !user;
+  const placeOrderDisabled = submitting || items.length === 0 || !user || !termsAccepted;
 
   const handleOrderSingle = async (productId: string, pm: PaymentMethod) => {
     const line = items.find((l) => l.productId === productId);
@@ -69,6 +70,10 @@ const Cart = () => {
     }
     if (!addressOk) {
       toast.error("Please fill your delivery address in Profile.");
+      return;
+    }
+    if (!termsAccepted) {
+      toast.error("Please accept the Terms & Conditions / Return & Refund Policy to proceed.");
       return;
     }
     setOrderingOne(productId);
@@ -258,26 +263,70 @@ const Cart = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          max={availability[line.productId]?.maxOrderable || undefined}
-                          value={line.quantity}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            const max = availability[line.productId]?.maxOrderable;
-                            if (typeof max === "number" && Number.isFinite(max) && max > 0) {
-                              setQuantity(line.productId, Math.min(Math.max(1, Math.floor(n)), Math.floor(max)));
-                              return;
-                            }
-                            setQuantity(line.productId, n);
-                          }}
-                          className="w-16 rounded-md border border-border px-2 py-1.5 text-sm bg-background text-foreground"
-                        />
+                        <div className="flex items-center border border-border rounded-lg bg-background overflow-hidden h-9">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newQty = line.quantity - 1;
+                              if (newQty >= 1) {
+                                setQuantity(line.productId, newQty);
+                              } else {
+                                removeLine(line.productId);
+                                toast.success(`"${line.name}" removed from cart`);
+                              }
+                            }}
+                            className="px-2.5 h-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors select-none flex items-center justify-center border-r border-border"
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          
+                          <input
+                            type="number"
+                            min={1}
+                            max={availability[line.productId]?.maxOrderable || undefined}
+                            value={line.quantity}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              const max = availability[line.productId]?.maxOrderable;
+                              if (typeof max === "number" && Number.isFinite(max) && max > 0) {
+                                setQuantity(line.productId, Math.min(Math.max(1, Math.floor(n)), Math.floor(max)));
+                                return;
+                              }
+                              setQuantity(line.productId, n);
+                            }}
+                            className="w-10 text-center border-none py-1 text-sm bg-transparent text-foreground focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const max = availability[line.productId]?.maxOrderable;
+                              const newQty = line.quantity + 1;
+                              if (typeof max === "number" && Number.isFinite(max) && max > 0) {
+                                if (newQty <= max) {
+                                  setQuantity(line.productId, newQty);
+                                } else {
+                                  toast.warning(`Only ${max} items are available in stock.`);
+                                }
+                              } else {
+                                setQuantity(line.productId, newQty);
+                              }
+                            }}
+                            className="px-2.5 h-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors select-none flex items-center justify-center border-l border-border"
+                            aria-label="Increase quantity"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
                         <button
                           type="button"
-                          onClick={() => removeLine(line.productId)}
-                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground"
+                          onClick={() => {
+                            removeLine(line.productId);
+                            toast.success(`"${line.name}" removed from cart`);
+                          }}
+                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
                           aria-label="Remove"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -371,6 +420,27 @@ const Cart = () => {
                             </button>
                           ))}
                         </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-4 mb-2 p-3 bg-muted/20 border border-border/50 rounded-xl">
+                        <input
+                          id="terms-checkbox"
+                          type="checkbox"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                        />
+                        <label htmlFor="terms-checkbox" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
+                          I agree to the{" "}
+                          <Link
+                            to="/return-refund-policy"
+                            className="text-primary font-bold hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Terms &amp; Conditions / Return &amp; Refund Policy
+                          </Link>
+                        </label>
                       </div>
 
                       <button

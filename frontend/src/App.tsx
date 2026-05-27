@@ -31,6 +31,7 @@ const AdminStub = lazy(() => import("./pages/admin/AdminStub"));
 const ManageTransactions = lazy(() => import("./pages/admin/ManageTransactions"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Profile = lazy(() => import("./pages/Profile"));
+const ReturnRefundPolicy = lazy(() => import("./pages/ReturnRefundPolicy"));
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/orders/pending" element={<Orders />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/return-refund-policy" element={<ReturnRefundPolicy />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route element={<AdminLayout />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />

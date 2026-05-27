@@ -1,5 +1,26 @@
 import { jsPDF } from "jspdf";
 import type { OrderDoc } from "@/lib/orderApi";
+import { logoBase64 } from "@/assets/logoBase64";
+
+/** Draw royal oven logo as a subtle watermark in the center of the page */
+function drawWatermark(doc: jsPDF, pageW: number, pageH: number) {
+  try {
+    const watermarkW = 200;
+    const watermarkH = 200;
+    const watermarkX = (pageW - watermarkW) / 2;
+    const watermarkY = (pageH - watermarkH) / 2;
+
+    doc.saveGraphicsState();
+    // 5% opacity: extremely subtle, highly readable text over it
+    const gState = new (doc as any).GState({ opacity: 0.2 });
+    doc.setGState(gState);
+    doc.addImage(logoBase64, "PNG", watermarkX, watermarkY, watermarkW, watermarkH, undefined, "FAST");
+    doc.restoreGraphicsState();
+  } catch (err) {
+    console.error("Failed to render invoice watermark:", err);
+  }
+}
+
 
 /** Seller GST identification number (India) */
 export const SELLER_GSTIN = "33ACGFM2172B1ZQ";
@@ -98,11 +119,13 @@ export function downloadOrderInvoicePdf(order: OrderDoc): void {
   const itemLeft = m + 2;
   const itemMaxW = Math.max(28, xQty - itemLeft - gap);
 
-  // Header bar
   doc.setFillColor(...C.primaryDark);
   doc.rect(0, 0, pageW, headerH, "F");
   doc.setFillColor(...C.secondary);
   doc.rect(0, headerH, pageW, 1.2, "F");
+
+  // Draw watermark on the first page
+  drawWatermark(doc, pageW, pageH);
 
   const textStartX = m;
 
@@ -214,6 +237,7 @@ export function downloadOrderInvoicePdf(order: OrderDoc): void {
   for (const it of order.items) {
     if (y > pageH - 42) {
       doc.addPage();
+      drawWatermark(doc, pageW, pageH);
       y = m + 8;
     }
     if (row % 2 === 0) {
