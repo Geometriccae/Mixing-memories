@@ -143,6 +143,15 @@
     animation: marquee-ltr 45s linear infinite;
   }
 
+  /** Horizontal/vertical scroll without visible scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /** Admin sidebar nav — slim scrollbar using sidebar theme tokens */
   .admin-sidebar-scroll {
     scrollbar-width: thin;

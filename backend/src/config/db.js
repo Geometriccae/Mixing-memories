@@ -1,5 +1,11 @@
+const dns = require("dns");
 const mongoose = require("mongoose");
 const env = require("./env");
+
+/** Node on Windows may fail SRV lookups against the system DNS (querySrv ECONNREFUSED). */
+if (env.dnsServers?.length) {
+  dns.setServers(env.dnsServers);
+}
 
 async function connectDB() {
   if (!env.mongoUri) {

@@ -29,7 +29,8 @@ import { cn } from "@/lib/utils";
 
 const isOrdersPath = (p: string) => p === "/admin/orders" || p.startsWith("/admin/orders/");
 const isTransactionsPath = (p: string) => p === "/admin/transactions" || p.startsWith("/admin/transactions/");
-const isMasterPath = (p: string) => p.startsWith("/admin/master/") || p === "/admin/testimonials";
+const isMasterPath = (p: string) =>
+  p.startsWith("/admin/master/") || p === "/admin/testimonials" || p === "/admin/instagram-shorts";
 
 const PAGE_TITLES: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
@@ -45,6 +46,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/transactions/pending": "Pending Transaction",
   "/admin/users": "Customer",
   "/admin/testimonials": "Testimonials",
+  "/admin/instagram-shorts": "Instagram Shorts",
   "/admin/master/manufacturer": "Manufacturer List",
   "/admin/master/quality": "Quality List",
 };
@@ -257,6 +259,14 @@ const AdminLayout = () => {
                 >
                   <span className="text-sidebar-foreground/50 shrink-0">-</span>
                   <span>Testimonials</span>
+                </Link>
+                <Link
+                  to="/admin/instagram-shorts"
+                  onClick={() => setSidebarOpen(false)}
+                  className={subLinkClass("/admin/instagram-shorts")}
+                >
+                  <span className="text-sidebar-foreground/50 shrink-0">-</span>
+                  <span>Instagram Shorts</span>
                 </Link>
               </div>
             </div>

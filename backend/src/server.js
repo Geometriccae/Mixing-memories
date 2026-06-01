@@ -3,6 +3,7 @@ const connectDB = require("./config/db");
 const env = require("./config/env");
 const Product = require("./models/Product");
 const { seedTestimonialsIfEmpty } = require("./utils/seedTestimonials");
+const { seedInstagramReelsIfEmpty } = require("./utils/seedInstagramReels");
 
 /** Backfill hasImage / hasVideo for older documents (avoids loading Buffers in list queries). */
 async function migrateProductMediaFlags() {
@@ -51,6 +52,7 @@ async function bootstrap() {
 
   await connectDB();
   await seedTestimonialsIfEmpty();
+  await seedInstagramReelsIfEmpty();
   await migrateProductMediaFlags();
 
   app.listen(env.port, () => {
