@@ -14,21 +14,23 @@ const AboutSection = () => (
   <SectionWrapper>
     <div className="grid lg:grid-cols-2 gap-12 items-center">
       <div>
-        <span className="text-primary text-sm font-semibold uppercase tracking-wider" style={{ fontFamily: "'Algerian', cursive" }}>Why Choose Us</span>
-        <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mt-3 mb-2" style={{ fontFamily: "'Algerian', cursive" }}>
+        <span className="font-body text-primary text-sm font-semibold uppercase tracking-wider">
+          Why Choose Us
+        </span>
+        <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mt-3 mb-2">
           Right Snack, Right Now
         </h2>
-        <p className="text-primary font-semibold uppercase tracking-widest text-sm mb-4" style={{ fontFamily: "'Algerian', cursive" }}>
+        <p className="font-body text-primary font-semibold uppercase tracking-widest text-sm mb-4">
           Where Every Crunch Tells a Story
         </p>
-        <div className="space-y-4 text-muted-foreground leading-relaxed mb-8" style={{ fontFamily: "'Monotype Corsiva', cursive" }}>
+        <div className="font-body space-y-4 text-muted-foreground leading-relaxed mb-8">
           <p>
             Discover the pioneer of Right Snacks. Handcrafted with pure, transparent ingredients
             and a lot of love — wholesome goodness delivered to your doorstep.
           </p>
 
           <div className="pt-4">
-            <h3 className="font-display text-xl font-bold text-foreground mb-4" style={{ fontFamily: "'Algerian', cursive" }}>Our Story</h3>
+            <h3 className="font-display text-xl font-bold text-foreground mb-4">Our Story</h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
                 <span className="mt-2 h-2 w-2 rounded-full bg-primary shrink-0" />
@@ -67,8 +69,8 @@ const AboutSection = () => (
               <f.icon className="h-7 w-7" />
             </div>
             <div>
-              <h4 className="font-display text-xl font-bold text-foreground leading-tight" style={{ fontFamily: "'Monotype Corsiva', cursive" }}>{f.title}</h4>
-              <p className="text-base text-muted-foreground mt-2 leading-relaxed font-medium" style={{ fontFamily: "'Monotype Corsiva', cursive" }}>{f.desc}</p>
+              <h4 className="font-display text-xl font-bold text-foreground leading-tight">{f.title}</h4>
+              <p className="font-body text-base text-muted-foreground mt-2 leading-relaxed">{f.desc}</p>
             </div>
           </motion.div>
         ))}

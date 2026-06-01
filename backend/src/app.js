@@ -14,6 +14,7 @@ const checkoutRoutes = require("./routes/checkoutRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const userRoutes = require("./routes/userRoutes");
 const testimonialRoutes = require("./routes/testimonialRoutes");
+const instagramRoutes = require("./routes/instagramRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 /** Don't gzip JPEG/MP4 responses (already compressed; wastes CPU). */
@@ -67,6 +68,7 @@ app.use("/api/checkout", checkoutRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/testimonials", testimonialRoutes);
+app.use("/api/instagram", instagramRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

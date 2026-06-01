@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { MapPin, Phone, Mail, Facebook, Instagram, Globe, Smartphone, FileText, BadgeCheck } from "lucide-react";
 import royalOvenLogo from "@/assets/royal-oven-logo.png";
-import fssaiLicenseQr from "@/assets/fssai_license_qr.png";
+import footerQr from "@/assets/qr.jpg";
 
 const WHATSAPP_CHAT_URL = "https://wa.me/917338843363";
 const FACEBOOK_URL = "https://www.facebook.com/RO.RoyalOven";
@@ -147,8 +147,8 @@ const Footer = () => (
             </li>
             <li className="pl-6 mt-1">
               <img
-                src={fssaiLicenseQr}
-                alt="FSSAI License QR"
+                src={footerQr}
+                alt="Royal Oven QR code"
                 className="h-16 w-16 object-contain rounded bg-white p-0.5 border border-background/20"
               />
             </li>
