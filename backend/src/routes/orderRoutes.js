@@ -8,6 +8,8 @@ const {
   abandonUnpaidMyOrder,
   updateOrderStatus,
   updateOrderPaymentStatus,
+  deleteAdminOrder,
+  clearAdminOrdersByPaymentStatus,
 } = require("../controllers/orderController");
 const { protect } = require("../middleware/authMiddleware");
 const { authorize } = require("../middleware/roleMiddleware");
@@ -20,6 +22,8 @@ router.patch("/:id/cancel", protect, cancelMyOrder);
 router.get("/my", protect, getMyOrders);
 router.get("/customer", getOrdersByCustomerEmail);
 router.get("/", protect, authorize("admin"), listOrders);
+router.delete("/transactions/clear", protect, authorize("admin"), clearAdminOrdersByPaymentStatus);
+router.delete("/:id", protect, authorize("admin"), deleteAdminOrder);
 router.patch("/:id/payment-status", protect, authorize("admin"), updateOrderPaymentStatus);
 router.patch("/:id/status", protect, authorize("admin"), updateOrderStatus);
 

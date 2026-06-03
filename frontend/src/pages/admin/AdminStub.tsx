@@ -9,8 +9,6 @@ const titles: Record<string, string> = {
   "/admin/transactions": "Transactions",
   "/admin/transactions/success": "Success Transaction",
   "/admin/transactions/pending": "Pending Transaction",
-  "/admin/master/manufacturer": "Manufacturer List",
-  "/admin/master/quality": "Quality List",
 };
 
 const AdminStub = () => {

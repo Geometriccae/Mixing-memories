@@ -12,7 +12,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { fetchAdminOrders, patchOrderPaymentStatus, type OrderDoc } from "@/lib/orderApi";
+import {
+  clearAdminOrdersByPaymentStatus,
+  deleteAdminOrder,
+  fetchAdminOrders,
+  patchOrderPaymentStatus,
+  type OrderDoc,
+} from "@/lib/orderApi";
 import { orderDisplayId, paymentStatusLabel } from "@/lib/orderInvoicePdf";
 
 const navy = "bg-[hsl(222_47%_16%)]";
@@ -36,6 +42,8 @@ const ManageTransactions = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [markPaidTarget, setMarkPaidTarget] = useState<OrderDoc | null>(null);
+  const [clearTarget, setClearTarget] = useState<OrderDoc | null>(null);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
 
   const refresh = async () => {
     if (!token) {
@@ -80,6 +88,43 @@ const ManageTransactions = () => {
     })();
   };
 
+  const confirmClearOne = () => {
+    if (!token || !clearTarget) return;
+    const orderId = clearTarget._id;
+    void (async () => {
+      setUpdatingId(orderId);
+      try {
+        await deleteAdminOrder(token, orderId);
+        toast.success("Order removed from this list.");
+        setClearTarget(null);
+        setOrders((prev) => prev.filter((o) => o._id !== orderId));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(msg);
+      } finally {
+        setUpdatingId(null);
+      }
+    })();
+  };
+
+  const confirmClearAll = () => {
+    if (!token) return;
+    void (async () => {
+      setUpdatingId("__all__");
+      try {
+        const removed = await clearAdminOrdersByPaymentStatus(token, paymentFilter);
+        toast.success(removed > 0 ? `Cleared ${removed} order${removed === 1 ? "" : "s"}.` : "No orders to clear.");
+        setClearAllOpen(false);
+        setOrders([]);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(msg);
+      } finally {
+        setUpdatingId(null);
+      }
+    })();
+  };
+
   if (!token) {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
@@ -93,12 +138,26 @@ const ManageTransactions = () => {
     paymentFilter === "paid"
       ? "Orders where payment has been confirmed."
       : "Razorpay usually marks these paid automatically; use this list for edge cases or manual fixes.";
+  const listLabel = paymentFilter === "paid" ? "successful payment" : "pending payment";
+  const busy = updatingId !== null;
 
   return (
     <div className="rounded-xl bg-card border border-border/60 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="px-5 py-4 border-b border-border">
-        <h3 className="font-semibold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+      <div className="px-5 py-4 border-b border-border flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-foreground">{title}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+        </div>
+        {!loading && orders.length > 0 ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setClearAllOpen(true)}
+            className="shrink-0 rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-xs font-semibold px-4 py-2 hover:bg-destructive/15 disabled:opacity-40 disabled:pointer-events-none"
+          >
+            Clear all
+          </button>
+        ) : null}
       </div>
       <div className="p-5 pt-4">
         {loading ? (
@@ -107,7 +166,7 @@ const ManageTransactions = () => {
           <p className="text-sm text-muted-foreground">No orders in this list.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm min-w-[960px]">
+            <table className="w-full text-sm min-w-[1020px]">
               <thead>
                 <tr>
                   <th className={thClass}>Order ID</th>
@@ -119,7 +178,7 @@ const ManageTransactions = () => {
                   <th className={thClass}>Pay method</th>
                   <th className={thClass}>Delivery</th>
                   <th className={thClass}>Payment</th>
-                  {paymentFilter === "pending" ? <th className={`${thClass} text-center`}>Action</th> : null}
+                  <th className={`${thClass} text-center`}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -155,18 +214,28 @@ const ManageTransactions = () => {
                         {paymentStatusLabel(o.paymentStatus)}
                       </span>
                     </td>
-                    {paymentFilter === "pending" ? (
-                      <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {paymentFilter === "pending" ? (
+                          <button
+                            type="button"
+                            disabled={busy || String(o.status).toLowerCase() === "cancelled"}
+                            onClick={() => setMarkPaidTarget(o)}
+                            className="rounded-lg bg-primary text-primary-foreground text-xs font-semibold px-3 py-1.5 hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
+                          >
+                            Mark successful
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          disabled={updatingId === o._id || String(o.status).toLowerCase() === "cancelled"}
-                          onClick={() => setMarkPaidTarget(o)}
-                          className="rounded-lg bg-primary text-primary-foreground text-xs font-semibold px-3 py-1.5 hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
+                          disabled={busy}
+                          onClick={() => setClearTarget(o)}
+                          className="rounded-lg border border-destructive/40 text-destructive text-xs font-semibold px-3 py-1.5 hover:bg-destructive/10 disabled:opacity-40 disabled:pointer-events-none"
                         >
-                          Mark successful
+                          Clear
                         </button>
-                      </td>
-                    ) : null}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -214,6 +283,72 @@ const ManageTransactions = () => {
               onClick={() => void confirmMarkPaid()}
             >
               {updatingId !== null ? "Saving…" : "Mark paid"}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={clearTarget !== null}
+        onOpenChange={(open) => !open && updatingId === null && setClearTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this order?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-left">
+              <span className="block text-sm text-muted-foreground">
+                This permanently removes the order from the database and from this {listLabel} list. This cannot be
+                undone.
+              </span>
+              {clearTarget ? (
+                <ul className="list-none space-y-1 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+                  <li>
+                    <span className="text-muted-foreground">Order: </span>
+                    {orderDisplayId(clearTarget)}
+                  </li>
+                  <li>
+                    <span className="text-muted-foreground">Customer: </span>
+                    {clearTarget.customerName}
+                  </li>
+                  <li>
+                    <span className="text-muted-foreground">Amount: </span>₹{Number(clearTarget.totalAmount).toFixed(2)}
+                  </li>
+                </ul>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              disabled={busy}
+              className={cn(buttonVariants({ variant: "destructive" }), "sm:mt-0")}
+              onClick={() => void confirmClearOne()}
+            >
+              {updatingId === clearTarget?._id ? "Clearing…" : "Clear"}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={clearAllOpen} onOpenChange={(open) => !open && updatingId === null && setClearAllOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all {title.toLowerCase()}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove all {orders.length} order{orders.length === 1 ? "" : "s"} in this list from
+              the database. Unpaid placed orders will have stock restored. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              disabled={busy}
+              className={cn(buttonVariants({ variant: "destructive" }), "sm:mt-0")}
+              onClick={() => void confirmClearAll()}
+            >
+              {updatingId === "__all__" ? "Clearing…" : "Clear all"}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

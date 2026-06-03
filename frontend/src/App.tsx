@@ -28,7 +28,6 @@ const ManageTestimonials = lazy(() => import("./pages/admin/ManageTestimonials")
 const ManageInstagramShorts = lazy(() => import("./pages/admin/ManageInstagramShorts"));
 const ManageUsers = lazy(() => import("./pages/admin/ManageUsers"));
 const ManageOrders = lazy(() => import("./pages/admin/ManageOrders"));
-const AdminStub = lazy(() => import("./pages/admin/AdminStub"));
 const ManageTransactions = lazy(() => import("./pages/admin/ManageTransactions"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -81,8 +80,6 @@ const App = () => (
               <Route path="/admin/transactions" element={<ManageTransactions />} />
               <Route path="/admin/transactions/success" element={<ManageTransactions />} />
               <Route path="/admin/transactions/pending" element={<ManageTransactions />} />
-              <Route path="/admin/master/manufacturer" element={<AdminStub />} />
-              <Route path="/admin/master/quality" element={<AdminStub />} />
               <Route path="/admin/testimonials" element={<ManageTestimonials />} />
               <Route path="/admin/instagram-shorts" element={<ManageInstagramShorts />} />
               <Route path="/admin/users" element={<ManageUsers />} />
