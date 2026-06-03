@@ -146,6 +146,36 @@ export async function fetchAdminOrders(
   return Array.isArray(data) ? (data as OrderDoc[]) : [];
 }
 
+export async function deleteAdminOrder(token: string, orderId: string): Promise<void> {
+  const res = await fetch(`${apiBaseUrl}/api/orders/${orderId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Failed to remove order.");
+  }
+}
+
+export async function clearAdminOrdersByPaymentStatus(
+  token: string,
+  paymentStatus: "pending" | "paid" | "failed",
+): Promise<number> {
+  const params = new URLSearchParams({ paymentStatus });
+  const res = await fetch(`${apiBaseUrl}/api/orders/transactions/clear?${params}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Failed to clear orders.");
+  }
+  const data = parseData<{ removed?: number }>(json);
+  return Number(data?.removed) || 0;
+}
+
 export async function patchOrderPaymentStatus(token: string, orderId: string, paymentStatus: string): Promise<void> {
   const res = await fetch(`${apiBaseUrl}/api/orders/${orderId}/payment-status`, {
     method: "PATCH",

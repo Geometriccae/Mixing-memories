@@ -346,6 +346,50 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: out });
 });
 
+function shouldRestockOnAdminDelete(order) {
+  if (String(order.status || "").toLowerCase() === "cancelled") return false;
+  const ps = String(order.paymentStatus || "").toLowerCase();
+  if (String(order.status || "").toLowerCase() !== "placed") return false;
+  return ps === "pending" || ps === "failed";
+}
+
+const deleteAdminOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid order id.");
+  }
+  const order = await Order.findById(id);
+  if (!order) throw new ApiError(404, "Order not found.");
+  if (shouldRestockOnAdminDelete(order)) {
+    await restockOrderItems(order.items);
+  }
+  for (const item of order.items) {
+    if (item.productId) bustDetailJsonCache(String(item.productId));
+  }
+  await Order.deleteOne({ _id: order._id });
+  res.json({ success: true, data: { removed: true } });
+});
+
+const clearAdminOrdersByPaymentStatus = asyncHandler(async (req, res) => {
+  const paymentStatus = req.query.paymentStatus != null ? String(req.query.paymentStatus).toLowerCase() : "";
+  if (!ALLOWED_PAYMENT_STATUS.includes(paymentStatus)) {
+    throw new ApiError(400, `paymentStatus must be one of: ${ALLOWED_PAYMENT_STATUS.join(", ")}`);
+  }
+  const orders = await Order.find({ paymentStatus }).lean();
+  let removed = 0;
+  for (const order of orders) {
+    if (shouldRestockOnAdminDelete(order)) {
+      await restockOrderItems(order.items);
+    }
+    for (const item of order.items) {
+      if (item.productId) bustDetailJsonCache(String(item.productId));
+    }
+    await Order.deleteOne({ _id: order._id });
+    removed += 1;
+  }
+  res.json({ success: true, data: { removed } });
+});
+
 const updateOrderPaymentStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { paymentStatus } = req.body || {};
@@ -373,4 +417,6 @@ module.exports = {
   abandonUnpaidMyOrder,
   updateOrderStatus,
   updateOrderPaymentStatus,
+  deleteAdminOrder,
+  clearAdminOrdersByPaymentStatus,
 };

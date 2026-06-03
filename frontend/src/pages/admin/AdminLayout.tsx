@@ -29,8 +29,7 @@ import { cn } from "@/lib/utils";
 
 const isOrdersPath = (p: string) => p === "/admin/orders" || p.startsWith("/admin/orders/");
 const isTransactionsPath = (p: string) => p === "/admin/transactions" || p.startsWith("/admin/transactions/");
-const isMasterPath = (p: string) =>
-  p.startsWith("/admin/master/") || p === "/admin/testimonials" || p === "/admin/instagram-shorts";
+const isMasterPath = (p: string) => p === "/admin/testimonials" || p === "/admin/instagram-shorts";
 
 const PAGE_TITLES: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
@@ -47,8 +46,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/admin/users": "Customer",
   "/admin/testimonials": "Testimonials",
   "/admin/instagram-shorts": "Instagram Shorts",
-  "/admin/master/manufacturer": "Manufacturer List",
-  "/admin/master/quality": "Quality List",
 };
 
 function headerTitleForPath(pathname: string): string {
@@ -241,17 +238,7 @@ const AdminLayout = () => {
           </button>
           {masterOpen && (
             <div className="mt-1 ml-4 pl-3 border-l border-sidebar-border space-y-2">
-              <div className="px-4 pt-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">List</div>
               <div className="space-y-0.5">
-                {[
-                  { to: "/admin/master/manufacturer", label: "Manufacturer List" },
-                  { to: "/admin/master/quality", label: "Quality List" },
-                ].map(({ to, label }) => (
-                  <Link key={to} to={to} onClick={() => setSidebarOpen(false)} className={subLinkClass(to)}>
-                    <span className="text-sidebar-foreground/50 shrink-0">-</span>
-                    <span>{label}</span>
-                  </Link>
-                ))}
                 <Link
                   to="/admin/testimonials"
                   onClick={() => setSidebarOpen(false)}
