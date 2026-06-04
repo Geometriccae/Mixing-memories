@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowRight, IndianRupee, Package, ShoppingCart, User } from "lucide-react";
 import { toast } from "sonner";
 import { apiBaseUrl } from "@/lib/apiConfig";
+import AdminOrderHistoryPanel from "@/components/admin/AdminOrderHistoryPanel";
 import OrderAnalyticsDateFilter from "@/components/admin/OrderAnalyticsDateFilter";
 import OrderStatusDonut from "@/components/admin/OrderStatusDonut";
 import OrdersTrendBarChart from "@/components/admin/OrdersTrendBarChart";
@@ -113,6 +114,14 @@ const AdminOrdersOverview = () => {
         loading={loading}
         onPreset={applyPreset}
         onApplyCustom={() => setApplied({ allTime: false, from: draftFrom, to: draftTo })}
+        description="Totals and charts below follow orders whose created date falls in the selected range."
+      />
+
+      <AdminOrderHistoryPanel
+        token={token}
+        applied={applied}
+        orderCountInRange={orders.length}
+        onHistoryChanged={() => void load()}
       />
 
       {loading ? (

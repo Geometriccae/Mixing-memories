@@ -178,29 +178,41 @@ function parseDayBoundary(raw, endOfDay) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-const listOrders = asyncHandler(async (req, res) => {
-  const { status, paymentStatus, from, to } = req.query;
-  const filter = {};
-  if (status && ALLOWED_STATUSES.includes(String(status))) {
-    filter.status = String(status);
-  }
-  if (paymentStatus && ALLOWED_PAYMENT_STATUS.includes(String(paymentStatus))) {
-    filter.paymentStatus = String(paymentStatus);
-  }
+function activeOrderFilter() {
+  return { $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] };
+}
+
+function binOrderFilter() {
+  return { deletedAt: { $ne: null, $exists: true } };
+}
+
+function applyCreatedAtRange(filter, from, to) {
   let fromD = parseDayBoundary(from, false);
   let toD = parseDayBoundary(to, true);
   if (fromD && toD && fromD.getTime() > toD.getTime()) {
-    const f = from;
-    const t = to;
-    fromD = parseDayBoundary(t, false);
-    toD = parseDayBoundary(f, true);
+    fromD = parseDayBoundary(to, false);
+    toD = parseDayBoundary(from, true);
   }
   if (fromD || toD) {
     filter.createdAt = {};
     if (fromD) filter.createdAt.$gte = fromD;
     if (toD) filter.createdAt.$lte = toD;
   }
-  const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
+  return filter;
+}
+
+const listOrders = asyncHandler(async (req, res) => {
+  const { status, paymentStatus, from, to, bin } = req.query;
+  const inBin = String(bin || "").toLowerCase() === "1" || String(bin || "").toLowerCase() === "true";
+  const filter = inBin ? binOrderFilter() : activeOrderFilter();
+  if (status && ALLOWED_STATUSES.includes(String(status))) {
+    filter.status = String(status);
+  }
+  if (paymentStatus && ALLOWED_PAYMENT_STATUS.includes(String(paymentStatus))) {
+    filter.paymentStatus = String(paymentStatus);
+  }
+  applyCreatedAtRange(filter, from, to);
+  const orders = await Order.find(filter).sort(inBin ? { deletedAt: -1 } : { createdAt: -1 }).lean();
   res.json({ success: true, data: orders });
 });
 
@@ -209,13 +221,13 @@ const getOrdersByCustomerEmail = asyncHandler(async (req, res) => {
   if (!email) {
     throw new ApiError(400, "email query parameter is required.");
   }
-  const orders = await Order.find({ email }).sort({ createdAt: -1 }).lean();
+  const orders = await Order.find({ email, ...activeOrderFilter() }).sort({ createdAt: -1 }).lean();
   res.json({ success: true, data: orders });
 });
 
 const getMyOrders = asyncHandler(async (req, res) => {
   if (!req.user) throw new ApiError(401, "Not authorized.");
-  const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean();
+  const orders = await Order.find({ userId: req.user._id, ...activeOrderFilter() }).sort({ createdAt: -1 }).lean();
   res.json({ success: true, data: orders });
 });
 
@@ -370,12 +382,62 @@ const deleteAdminOrder = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { removed: true } });
 });
 
+/** Soft-delete orders in created-date range (dashboard history → bin). */
+const moveOrdersToBinByRange = asyncHandler(async (req, res) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const from = body.from != null ? body.from : req.query.from;
+  const to = body.to != null ? body.to : req.query.to;
+  const allTime = body.allTime === true || String(req.query.allTime || "").toLowerCase() === "true";
+  if (!allTime) {
+    const fromD = parseDayBoundary(from, false);
+    const toD = parseDayBoundary(to, true);
+    if (!fromD || !toD) {
+      throw new ApiError(400, "from and to dates (YYYY-MM-DD) are required unless allTime is true.");
+    }
+  }
+  const filter = { ...activeOrderFilter() };
+  if (!allTime) applyCreatedAtRange(filter, from, to);
+  const now = new Date();
+  const result = await Order.updateMany(filter, { $set: { deletedAt: now } });
+  res.json({ success: true, data: { moved: result.modifiedCount || 0 } });
+});
+
+const restoreOrderFromBin = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid order id.");
+  }
+  const order = await Order.findOne({ _id: id, ...binOrderFilter() });
+  if (!order) throw new ApiError(404, "Order not found in bin.");
+  order.deletedAt = null;
+  await order.save();
+  const out = await Order.findById(id).lean();
+  res.json({ success: true, data: out });
+});
+
+const permanentDeleteBinOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid order id.");
+  }
+  const order = await Order.findOne({ _id: id, ...binOrderFilter() });
+  if (!order) throw new ApiError(404, "Order not found in bin.");
+  if (shouldRestockOnAdminDelete(order)) {
+    await restockOrderItems(order.items);
+  }
+  for (const item of order.items) {
+    if (item.productId) bustDetailJsonCache(String(item.productId));
+  }
+  await Order.deleteOne({ _id: order._id });
+  res.json({ success: true, data: { removed: true } });
+});
+
 const clearAdminOrdersByPaymentStatus = asyncHandler(async (req, res) => {
   const paymentStatus = req.query.paymentStatus != null ? String(req.query.paymentStatus).toLowerCase() : "";
   if (!ALLOWED_PAYMENT_STATUS.includes(paymentStatus)) {
     throw new ApiError(400, `paymentStatus must be one of: ${ALLOWED_PAYMENT_STATUS.join(", ")}`);
   }
-  const orders = await Order.find({ paymentStatus }).lean();
+  const orders = await Order.find({ paymentStatus, ...activeOrderFilter() }).lean();
   let removed = 0;
   for (const order of orders) {
     if (shouldRestockOnAdminDelete(order)) {
@@ -419,4 +481,7 @@ module.exports = {
   updateOrderPaymentStatus,
   deleteAdminOrder,
   clearAdminOrdersByPaymentStatus,
+  moveOrdersToBinByRange,
+  restoreOrderFromBin,
+  permanentDeleteBinOrder,
 };

@@ -64,6 +64,8 @@ const orderSchema = new mongoose.Schema(
     cancelledBy: { type: String, enum: ["user", "admin"], required: false },
     /** Admin cancellation message shown to the customer (optional for user-initiated cancel) */
     cancelReason: { type: String, default: "", trim: true, maxlength: 2000 },
+    /** Soft-delete: set when admin moves order history to bin; null = active */
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }
 );
