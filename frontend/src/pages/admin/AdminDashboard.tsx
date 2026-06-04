@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { IndianRupee, Package, ShoppingCart, TrendingUp, User } from "lucide-react";
 import { toast } from "sonner";
 import { apiBaseUrl } from "@/lib/apiConfig";
+import AdminOrderHistoryPanel from "@/components/admin/AdminOrderHistoryPanel";
 import OrderAnalyticsDateFilter from "@/components/admin/OrderAnalyticsDateFilter";
 import OrderStatusDonut from "@/components/admin/OrderStatusDonut";
 import OrdersTrendBarChart from "@/components/admin/OrdersTrendBarChart";
@@ -150,6 +151,13 @@ const AdminDashboard = () => {
         onPreset={applyPreset}
         onApplyCustom={() => setApplied({ allTime: false, from: draftFrom, to: draftTo })}
         description="KPIs and charts use order created date in range. Calendar month cards below always use this month vs last month."
+      />
+
+      <AdminOrderHistoryPanel
+        token={token}
+        applied={applied}
+        orderCountInRange={orders.length}
+        onHistoryChanged={() => void loadMain()}
       />
 
       {loading ? (

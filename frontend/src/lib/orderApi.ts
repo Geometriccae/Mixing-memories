@@ -54,6 +54,7 @@ export type OrderDoc = {
   refundStatus?: "not_initiated" | "initiated" | "processed" | "failed";
   createdAt?: string;
   updatedAt?: string;
+  deletedAt?: string | null;
 };
 
 function parseData<T>(json: unknown): T | null {
@@ -109,6 +110,8 @@ export type AdminOrderFilters = {
   /** Inclusive `YYYY-MM-DD`, server filters by `createdAt` */
   from?: string | null;
   to?: string | null;
+  /** When true, list soft-deleted orders in the bin */
+  bin?: boolean;
 };
 
 export async function fetchAdminOrders(
@@ -120,18 +123,21 @@ export async function fetchAdminOrders(
   let paymentStatus: string | undefined;
   let from: string | undefined;
   let to: string | undefined;
+  let bin: boolean | undefined;
   if (typeof filters === "string") orderStatus = filters;
   else if (filters && typeof filters === "object") {
     orderStatus = filters.orderStatus ?? undefined;
     paymentStatus = filters.paymentStatus ?? undefined;
     from = filters.from?.trim() || undefined;
     to = filters.to?.trim() || undefined;
+    bin = filters.bin === true ? true : undefined;
   }
   const params = new URLSearchParams();
   if (orderStatus) params.set("status", orderStatus);
   if (paymentStatus) params.set("paymentStatus", paymentStatus);
   if (from) params.set("from", from);
   if (to) params.set("to", to);
+  if (bin) params.set("bin", "1");
   const q = params.toString();
   const url = q ? `${base}?${q}` : base;
   const res = await fetch(url, {
@@ -144,6 +150,59 @@ export async function fetchAdminOrders(
   }
   const data = (json as { data?: unknown }).data;
   return Array.isArray(data) ? (data as OrderDoc[]) : [];
+}
+
+export async function moveOrdersToBinByRange(
+  token: string,
+  range: { allTime: true } | { allTime?: false; from: string; to: string },
+): Promise<number> {
+  const body =
+    range.allTime === true
+      ? { allTime: true }
+      : { from: range.from, to: range.to };
+  const res = await fetch(`${apiBaseUrl}/api/orders/bin/move-range`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Failed to move orders to bin.");
+  }
+  const data = parseData<{ moved?: number }>(json);
+  return Number(data?.moved) || 0;
+}
+
+export async function fetchBinOrders(token: string): Promise<OrderDoc[]> {
+  return fetchAdminOrders(token, { bin: true });
+}
+
+export async function restoreOrderFromBin(token: string, orderId: string): Promise<OrderDoc> {
+  const res = await fetch(`${apiBaseUrl}/api/orders/bin/${orderId}/restore`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Failed to restore order.");
+  }
+  const data = parseData<OrderDoc>(json);
+  if (!data || !data._id) throw new Error("Invalid restore response.");
+  return data;
+}
+
+export async function permanentDeleteBinOrder(token: string, orderId: string): Promise<void> {
+  const res = await fetch(`${apiBaseUrl}/api/orders/bin/${orderId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json && typeof json === "object" && "message" in json ? String((json as { message?: unknown }).message) : "";
+    throw new Error(msg || "Failed to permanently delete order.");
+  }
 }
 
 export async function deleteAdminOrder(token: string, orderId: string): Promise<void> {
