@@ -23,4 +23,5 @@ module.exports = {
   smtpFrom: process.env.SMTP_FROM || process.env.SMTP_USER || "",
   smtpFromEmail: process.env.SMTP_USER || "",
   adminNotifyEmail: process.env.ADMIN_NOTIFY_EMAIL || process.env.SMTP_USER || "",
+  emailLogoUrl: process.env.EMAIL_LOGO_URL || "https://theroyaloven.com/royal-oven-logo.png",
 };
