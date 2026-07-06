@@ -15,4 +15,12 @@ module.exports = {
   corsOrigin: process.env.CORS_ORIGIN || "*",
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || "",
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || "",
+  smtpHost: process.env.SMTP_HOST || "",
+  smtpPort: Number(process.env.SMTP_PORT || 465),
+  smtpSecure: process.env.SMTP_SECURE !== "false",
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPass: process.env.SMTP_PASS || "",
+  smtpFrom: process.env.SMTP_FROM || process.env.SMTP_USER || "",
+  smtpFromEmail: process.env.SMTP_USER || "",
+  adminNotifyEmail: process.env.ADMIN_NOTIFY_EMAIL || process.env.SMTP_USER || "",
 };

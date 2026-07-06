@@ -10,6 +10,7 @@ const env = require("../config/env");
 const { bustDetailJsonCache } = require("../utils/productDetailJsonCache");
 const { withMongoOpRetry } = require("../utils/mongoReadRetry");
 const { getActiveShippingFromUser } = require("../utils/userShippingAddress");
+const { notifyOrderPaid } = require("../utils/emailService");
 
 const ALLOWED_PAYMENT_METHODS = ["upi", "netbanking", "card"];
 
@@ -292,6 +293,7 @@ const verifyCheckoutSession = asyncHandler(async (req, res) => {
     razorpayOrderId: razorpay_order_id,
     razorpayPaymentId: razorpay_payment_id,
   });
+  notifyOrderPaid(saved);
   res.json({ success: true, data: saved });
 });
 
