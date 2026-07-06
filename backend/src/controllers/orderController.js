@@ -7,6 +7,7 @@ const { bustDetailJsonCache } = require("../utils/productDetailJsonCache");
 const { withMongoOpRetry } = require("../utils/mongoReadRetry");
 const { getActiveShippingFromUser } = require("../utils/userShippingAddress");
 const { getRazorpayClient } = require("../utils/razorpay");
+const { notifyOrderStatusChange } = require("../utils/emailService");
 
 const ALLOWED_STATUSES = ["placed", "shipped", "completed", "cancelled"];
 const ALLOWED_PAYMENT_METHODS = ["upi", "netbanking", "card"];
@@ -352,9 +353,11 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     return res.json({ success: true, data: out });
   }
 
+  const previousStatus = existing.status;
   existing.status = nextStatus;
   await existing.save();
   const out = await Order.findById(id).lean();
+  notifyOrderStatusChange(out, previousStatus);
   res.json({ success: true, data: out });
 });
 

@@ -5,6 +5,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const env = require("../config/env");
 const { withMongoOpRetry } = require("../utils/mongoReadRetry");
+const { notifyOrderPaid } = require("../utils/emailService");
 
 function getRazorpayClient() {
   const key_id = env.razorpayKeyId;
@@ -103,6 +104,7 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
   order.razorpayPaymentId = String(razorpay_payment_id);
   await withMongoOpRetry(() => order.save());
   const saved = await withMongoOpRetry(() => Order.findById(order._id).lean());
+  notifyOrderPaid(saved);
   res.json({ success: true, data: saved });
 });
 
