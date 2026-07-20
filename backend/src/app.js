@@ -36,7 +36,7 @@ const corsOptions = {
     if (env.corsOrigin === "*") {
       callback(null, true);
     } else {
-      const allowedOrigins = env.corsOrigin.split(",");
+      const allowedOrigins = env.corsOrigin.split(",").map((o) => o.trim()).filter(Boolean);
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
