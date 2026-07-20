@@ -1,18 +1,19 @@
 /**
  * Utility to determine the API base URL automatically.
- * It uses the local backend if running on localhost or in development mode, 
- * otherwise it uses the VITE_API_BASE_URL from .env.
+ * In `npm run dev`, use same-origin + Vite proxy (/api → localhost:5000)
+ * so admin/storefront login works without CORS/cross-host fetch failures.
+ * Production uses VITE_API_BASE_URL from .env.
  */
 export const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   const localUrl = import.meta.env.VITE_LOCAL_API_BASE_URL || "http://localhost:5000";
 
-  // Check if we are in development mode (npm run dev)
+  // Development: empty base → fetch("/api/...") goes through Vite proxy
   if (import.meta.env.DEV) {
-    return localUrl;
+    return "";
   }
 
-  // Fallback for production if for some reason we want to override via hostname
+  // Local production preview (vite preview) on localhost
   if (typeof window !== "undefined") {
     const { hostname } = window.location;
     if (hostname === "localhost" || hostname === "127.0.0.1") {
